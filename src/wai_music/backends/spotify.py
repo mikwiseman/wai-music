@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from collections.abc import Iterable
 from typing import Any
 
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
+from wai_music.auth.current import current_user_id
+from wai_music.auth.spotify import refresh_access_token
+from wai_music.auth.store import SQLiteAuthStore
 from wai_music.backends.base import SavedTracksPage
 from wai_music.models import PlaylistRef, TrackDetails, TrackMatch, TrackQuery
 from wai_music.settings import WaiMusicSettings
@@ -24,17 +28,18 @@ CLASSICAL_TOKENS = ("concerto", "symphony", "sonata", "suite", "adagio", "opus",
 class SpotifyBackend:
     name = "spotify"
 
-    def __init__(self, settings: WaiMusicSettings) -> None:
+    def __init__(self, settings: WaiMusicSettings, *, auth_store: SQLiteAuthStore | None = None) -> None:
         self._settings = settings
-        self._client: spotipy.Spotify | None = None
+        self._auth_store = auth_store
+        self._legacy_client: spotipy.Spotify | None = None
 
     async def close(self) -> None:
-        if self._client is None:
+        if self._legacy_client is None:
             return
-        session = getattr(self._client, "_session", None)
+        session = getattr(self._legacy_client, "_session", None)
         if session is not None:
             await asyncio.to_thread(session.close)
-        self._client = None
+        self._legacy_client = None
 
     async def search_track(self, query: TrackQuery) -> list[TrackMatch]:
         search_query = _query_to_text(query)
@@ -54,10 +59,8 @@ class SpotifyBackend:
         description: str,
         public: bool = False,
     ) -> PlaylistRef:
-        current_user = await self._call("current_user")
         playlist = await self._call(
-            "user_playlist_create",
-            current_user["id"],
+            "current_user_playlist_create",
             name,
             public=public,
             description=description,
@@ -102,12 +105,62 @@ class SpotifyBackend:
         return [item for item in tracks if isinstance(item, dict)]
 
     async def _call(self, method_name: str, *args: Any, **kwargs: Any) -> Any:
-        client = self._get_client()
+        user_id = current_user_id()
+        if user_id is not None:
+            return await self._call_for_user(user_id, method_name, *args, **kwargs)
+        client = self._get_legacy_client()
         method = getattr(client, method_name)
         return await asyncio.to_thread(method, *args, **kwargs)
 
-    def _get_client(self) -> spotipy.Spotify:
-        if self._client is None:
+    async def _call_for_user(self, user_id: str, method_name: str, *args: Any, **kwargs: Any) -> Any:
+        if self._auth_store is None:
+            raise RuntimeError("Hosted Spotify auth store is not configured")
+        connection = self._auth_store.get_spotify_connection(user_id)
+        if connection is None:
+            raise RuntimeError("Spotify is not connected for this user")
+        token_payload = await self._ensure_fresh_user_token(user_id, connection.token_payload)
+        access_token = token_payload.get("access_token")
+        if not isinstance(access_token, str):
+            raise RuntimeError("Spotify access token is missing for this user")
+        client = spotipy.Spotify(auth=access_token, requests_timeout=self._settings.http_timeout_seconds)
+        try:
+            method = getattr(client, method_name)
+            return await asyncio.to_thread(method, *args, **kwargs)
+        finally:
+            session = getattr(client, "_session", None)
+            if session is not None:
+                await asyncio.to_thread(session.close)
+
+    async def _ensure_fresh_user_token(
+        self,
+        user_id: str,
+        token_payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        refresh_token = token_payload.get("refresh_token")
+        if not isinstance(refresh_token, str):
+            raise RuntimeError("Spotify refresh token is missing for this user")
+        expires_at = token_payload.get("expires_at")
+        if isinstance(expires_at, int) and expires_at > int(time.time()) + 60:
+            return token_payload
+        if isinstance(expires_at, float) and expires_at > time.time() + 60:
+            return token_payload
+        refreshed = await refresh_access_token(self._settings, refresh_token=refresh_token)
+        if "refresh_token" not in refreshed:
+            refreshed["refresh_token"] = refresh_token
+        if self._auth_store is None:
+            raise RuntimeError("Hosted Spotify auth store is not configured")
+        existing = self._auth_store.get_spotify_connection(user_id)
+        if existing is None:
+            raise RuntimeError("Spotify is not connected for this user")
+        self._auth_store.upsert_spotify_connection(
+            user_id=user_id,
+            spotify_user_id=existing.spotify_user_id,
+            token_payload=refreshed,
+        )
+        return refreshed
+
+    def _get_legacy_client(self) -> spotipy.Spotify:
+        if self._legacy_client is None:
             if not self._settings.spotify_client_id or not self._settings.spotify_client_secret:
                 raise RuntimeError("Spotify credentials are not configured")
             if not self._settings.spotify_cache_path.exists():
@@ -118,7 +171,7 @@ class SpotifyBackend:
             auth_manager = SpotifyOAuth(
                 client_id=self._settings.spotify_client_id,
                 client_secret=self._settings.spotify_client_secret,
-                redirect_uri=self._settings.spotify_redirect_uri,
+                redirect_uri=self._settings.effective_spotify_redirect_uri,
                 scope=" ".join(self._settings.spotify_scopes),
                 cache_path=str(self._settings.spotify_cache_path),
                 open_browser=False,
@@ -128,8 +181,8 @@ class SpotifyBackend:
                     f"Spotify token cache at {self._settings.spotify_cache_path} is missing, "
                     "expired, or invalid. Re-authorize with scripts/authorize_spotify.py."
                 )
-            self._client = spotipy.Spotify(auth_manager=auth_manager)
-        return self._client
+            self._legacy_client = spotipy.Spotify(auth_manager=auth_manager)
+        return self._legacy_client
 
 
 def _query_to_text(query: TrackQuery) -> str:

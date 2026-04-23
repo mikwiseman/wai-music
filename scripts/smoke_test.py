@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 from textwrap import dedent
 
 from wai_music.models import EntityType
@@ -13,6 +14,7 @@ from wai_music.tools.playback import create_backend_playlist, find_track
 
 async def main() -> int:
     services = create_services()
+    slug = f"rachmaninoff-smoke-test-{datetime.now(UTC).strftime('%H%M%S')}"
     try:
         artists = await services.aggregator.search_entities(
             "Rachmaninoff", EntityType.ARTIST, limit=1
@@ -52,7 +54,7 @@ async def main() -> int:
             services=services,
         )
         notes = save_markdown_notes(
-            "rachmaninoff-smoke-test",
+            slug,
             dedent(
                 f"""
                 # wai-music smoke test

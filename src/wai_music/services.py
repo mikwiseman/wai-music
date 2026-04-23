@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from inspect import isawaitable
 
 from wai_music.aggregator import EntityAggregator
+from wai_music.auth.store import SQLiteAuthStore
 from wai_music.backends.base import BackendRegistry
 from wai_music.backends.spotify import SpotifyBackend
 from wai_music.cache import SQLiteCache
@@ -18,6 +19,7 @@ from wai_music.sources.wikipedia import WikipediaSource
 class ServiceContainer:
     settings: WaiMusicSettings
     cache: SQLiteCache
+    auth_store: SQLiteAuthStore
     musicbrainz: MusicBrainzSource
     wikipedia: WikipediaSource
     aggregator: EntityAggregator
@@ -52,14 +54,16 @@ def create_services(settings: WaiMusicSettings | None = None) -> ServiceContaine
     configured = settings or WaiMusicSettings()
     configured.ensure_runtime_dirs()
     cache = SQLiteCache(configured.db_path)
+    auth_store = SQLiteAuthStore(configured.db_path, secret_key=configured.effective_secret_key)
     musicbrainz = MusicBrainzSource(settings=configured, cache=cache)
     wikipedia = WikipediaSource(settings=configured, cache=cache)
     aggregator = EntityAggregator(musicbrainz, wikipedia)
     backends = BackendRegistry()
-    backends.register(SpotifyBackend(configured))
+    backends.register(SpotifyBackend(configured, auth_store=auth_store))
     return ServiceContainer(
         settings=configured,
         cache=cache,
+        auth_store=auth_store,
         musicbrainz=musicbrainz,
         wikipedia=wikipedia,
         aggregator=aggregator,

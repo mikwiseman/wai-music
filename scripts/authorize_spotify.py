@@ -23,14 +23,14 @@ def main() -> int:
     auth_manager = SpotifyOAuth(
         client_id=settings.spotify_client_id,
         client_secret=settings.spotify_client_secret,
-        redirect_uri=settings.spotify_redirect_uri,
+        redirect_uri=settings.effective_spotify_redirect_uri,
         scope=" ".join(settings.spotify_scopes),
         cache_path=str(settings.spotify_cache_path),
         open_browser=False,
     )
     expected_state = secrets.token_urlsafe(32)
     authorize_url = auth_manager.get_authorize_url(state=expected_state)
-    redirect = urlparse(settings.spotify_redirect_uri)
+    redirect = urlparse(settings.effective_spotify_redirect_uri)
     if not redirect.hostname or not redirect.port:
         raise RuntimeError("SPOTIFY_REDIRECT_URI must include host and port")
 

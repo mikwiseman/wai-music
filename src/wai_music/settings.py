@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import urlparse
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from wai_music.languages import validate_language
+
+DEFAULT_LOCAL_SPOTIFY_REDIRECT_URI = "http://127.0.0.1:8888/callback"
 
 
 class WaiMusicSettings(BaseSettings):
@@ -20,7 +23,7 @@ class WaiMusicSettings(BaseSettings):
     spotify_client_id: str | None = Field(default=None, alias="SPOTIFY_CLIENT_ID")
     spotify_client_secret: str | None = Field(default=None, alias="SPOTIFY_CLIENT_SECRET")
     spotify_redirect_uri: str = Field(
-        default="http://127.0.0.1:8888/callback",
+        default=DEFAULT_LOCAL_SPOTIFY_REDIRECT_URI,
         alias="SPOTIFY_REDIRECT_URI",
     )
     spotify_cache_path: Path = Field(
@@ -39,6 +42,32 @@ class WaiMusicSettings(BaseSettings):
     )
     http_timeout_seconds: float = 10.0
     musicbrainz_rate_limit_per_second: float = 1.0
+    host: str = Field(default="127.0.0.1", alias="WAI_MUSIC_HOST")
+    port: int = Field(default=8765, alias="WAI_MUSIC_PORT")
+    public_base_url: str | None = Field(default=None, alias="WAI_MUSIC_PUBLIC_BASE_URL")
+    secret_key: str | None = Field(default=None, alias="WAI_MUSIC_SECRET_KEY")
+    session_cookie_name: str = Field(default="wai_music_session", alias="WAI_MUSIC_SESSION_COOKIE")
+    session_ttl_seconds: int = Field(default=60 * 60 * 24 * 30, alias="WAI_MUSIC_SESSION_TTL_SECONDS")
+    oauth_access_token_ttl_seconds: int = Field(
+        default=60 * 60,
+        alias="WAI_MUSIC_OAUTH_ACCESS_TOKEN_TTL_SECONDS",
+    )
+    oauth_refresh_token_ttl_seconds: int = Field(
+        default=60 * 60 * 24 * 90,
+        alias="WAI_MUSIC_OAUTH_REFRESH_TOKEN_TTL_SECONDS",
+    )
+    oauth_auth_request_ttl_seconds: int = Field(
+        default=60 * 10,
+        alias="WAI_MUSIC_OAUTH_AUTH_REQUEST_TTL_SECONDS",
+    )
+    oauth_authorization_code_ttl_seconds: int = Field(
+        default=60 * 5,
+        alias="WAI_MUSIC_OAUTH_AUTHORIZATION_CODE_TTL_SECONDS",
+    )
+    spotify_oauth_state_ttl_seconds: int = Field(
+        default=60 * 10,
+        alias="WAI_MUSIC_SPOTIFY_OAUTH_STATE_TTL_SECONDS",
+    )
 
     @field_validator("spotify_cache_path", "db_path", "playlists_dir", mode="before")
     @classmethod
@@ -63,6 +92,59 @@ class WaiMusicSettings(BaseSettings):
             "playlist-modify-public",
             "user-read-recently-played",
         ]
+
+    @property
+    def effective_spotify_redirect_uri(self) -> str:
+        if self.public_base_url and self.spotify_redirect_uri == DEFAULT_LOCAL_SPOTIFY_REDIRECT_URI:
+            return f"{self.public_base_url.rstrip('/')}/auth/spotify/callback"
+        return self.spotify_redirect_uri
+
+    @property
+    def oauth_enabled(self) -> bool:
+        return self.public_base_url is not None
+
+    @property
+    def effective_secret_key(self) -> str:
+        if self.secret_key:
+            return self.secret_key
+        return "wai-music-development-secret-key"
+
+    @property
+    def cookie_secure(self) -> bool:
+        return bool(self.public_base_url and self.public_base_url.startswith("https://"))
+
+    @property
+    def public_host(self) -> str | None:
+        if not self.public_base_url:
+            return None
+        parsed = urlparse(self.public_base_url)
+        return parsed.netloc or None
+
+    @property
+    def allowed_hosts(self) -> list[str]:
+        if not self.public_host:
+            return [self.host, f"{self.host}:{self.port}"]
+        return [self.public_host]
+
+    @property
+    def allowed_origins(self) -> list[str]:
+        if not self.public_base_url:
+            return [f"http://{self.host}:{self.port}"]
+        return [self.public_base_url]
+
+    @property
+    def oauth_issuer_url(self) -> str | None:
+        return self.public_base_url
+
+    @property
+    def oauth_resource_server_url(self) -> str | None:
+        if not self.public_base_url:
+            return None
+        return f"{self.public_base_url.rstrip('/')}/mcp"
+
+    @property
+    def oauth_required_scopes(self) -> list[str]:
+        return ["mcp:tools"]
 
     def ensure_runtime_dirs(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)

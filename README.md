@@ -65,6 +65,11 @@ Run the streamable HTTP transport:
 uv run wai-music --http --port 8765
 ```
 
+This hosted mode now serves both:
+
+- a browser UI (`/`, `/sign-in`, `/dashboard`)
+- the MCP endpoint (`/mcp`)
+
 ## Environment
 
 Create `.env` from `.env.example` and fill at least the Spotify values if you want playback tools:
@@ -78,6 +83,10 @@ SPOTIFY_CACHE_PATH=~/.config/wai-music/spotify_token.json
 WAI_MUSIC_DB_PATH=~/.config/wai-music/cache.sqlite
 WAI_MUSIC_PLAYLISTS_DIR=./playlists
 WAI_MUSIC_DEFAULT_LANGUAGE=en
+WAI_MUSIC_HOST=127.0.0.1
+WAI_MUSIC_PORT=8765
+WAI_MUSIC_PUBLIC_BASE_URL=
+WAI_MUSIC_SECRET_KEY=
 
 MUSICBRAINZ_USER_AGENT=wai-music/0.1 (+https://github.com/mikwiseman/wai-music)
 ```
@@ -99,6 +108,19 @@ uv run python scripts/authorize_spotify.py
 ```
 
 The script opens the browser, captures the callback on `SPOTIFY_REDIRECT_URI`, exchanges the code, and stores the refresh-token cache at `SPOTIFY_CACHE_PATH`.
+
+For hosted multi-user mode, set:
+
+```dotenv
+WAI_MUSIC_PUBLIC_BASE_URL=https://music.waiwai.is
+WAI_MUSIC_SECRET_KEY=...
+```
+
+and register this Spotify redirect URI:
+
+`https://music.waiwai.is/auth/spotify/callback`
+
+In hosted mode, users connect Spotify through the web UI and receive user-scoped MCP access through OAuth.
 
 ## Claude Code / MCP Setup
 
@@ -123,6 +145,17 @@ uv run wai-music --http --port 8765
 ```
 
 Then point the client to `http://127.0.0.1:8765/mcp`.
+
+## Hosted Mode
+
+`wai-music` can now run as a hosted multi-user service:
+
+- browser auth and dashboard
+- per-user Spotify connections
+- protected MCP endpoint with OAuth
+- user-scoped playlist history and notes
+
+For production deployment under `music.waiwai.is`, see [docs/deploy/ubuntu-24.04.md](docs/deploy/ubuntu-24.04.md).
 
 ## Example Prompts
 

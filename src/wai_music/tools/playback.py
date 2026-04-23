@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
+from wai_music.auth.current import current_user_id
 from wai_music.models import Entity, PlaylistCreationResult, PlaylistRef, TrackMatch, TrackQuery
 from wai_music.services import ServiceContainer
 
@@ -47,7 +48,12 @@ async def create_backend_playlist(
             f"playlist {playlist.playlist_id} was created remotely, but adding tracks failed"
         ) from exc
     try:
-        services.cache.record_playlist(backend=backend, playlist_id=playlist.playlist_id, slug=name)
+        services.cache.record_playlist(
+            user_id=current_user_id(),
+            backend=backend,
+            playlist_id=playlist.playlist_id,
+            slug=name,
+        )
     except Exception as exc:
         raise RuntimeError(
             "playlist was created remotely, but local playlist history persistence failed"

@@ -1,0 +1,14 @@
+music.waiwai.is {
+  encode zstd gzip
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    X-Frame-Options "DENY"
+  }
+
+  reverse_proxy wai-music:8000 {
+    flush_interval -1
+  }
+}

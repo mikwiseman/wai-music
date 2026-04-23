@@ -43,6 +43,7 @@ class SQLiteCache:
                 """
                 CREATE TABLE IF NOT EXISTS playlists_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT,
                     backend TEXT NOT NULL,
                     playlist_id TEXT NOT NULL,
                     slug TEXT NOT NULL,
@@ -50,6 +51,12 @@ class SQLiteCache:
                 )
                 """
             )
+            columns = {
+                str(row["name"])
+                for row in connection.execute("PRAGMA table_info(playlists_history)").fetchall()
+            }
+            if "user_id" not in columns:
+                connection.execute("ALTER TABLE playlists_history ADD COLUMN user_id TEXT")
 
     def get_json(self, url: str) -> Any | None:
         with self._connect() as connection:
@@ -88,6 +95,7 @@ class SQLiteCache:
     def record_playlist(
         self,
         *,
+        user_id: str | None = None,
         backend: str,
         playlist_id: str,
         slug: str,
@@ -97,19 +105,30 @@ class SQLiteCache:
         with self._connect() as connection:
             connection.execute(
                 """
-                INSERT INTO playlists_history(backend, playlist_id, slug, created_at)
-                VALUES(?, ?, ?, ?)
+                INSERT INTO playlists_history(user_id, backend, playlist_id, slug, created_at)
+                VALUES(?, ?, ?, ?, ?)
                 """,
-                (backend, playlist_id, slug, timestamp),
+                (user_id, backend, playlist_id, slug, timestamp),
             )
 
-    def list_playlists(self) -> list[dict[str, str]]:
+    def list_playlists(self, *, user_id: str | None = None) -> list[dict[str, str]]:
         with self._connect() as connection:
-            rows = connection.execute(
-                """
-                SELECT id, backend, playlist_id, slug, created_at
-                FROM playlists_history
-                ORDER BY id ASC
-                """
-            ).fetchall()
+            if user_id is None:
+                rows = connection.execute(
+                    """
+                    SELECT id, user_id, backend, playlist_id, slug, created_at
+                    FROM playlists_history
+                    ORDER BY id ASC
+                    """
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    """
+                    SELECT id, user_id, backend, playlist_id, slug, created_at
+                    FROM playlists_history
+                    WHERE user_id = ?
+                    ORDER BY id ASC
+                    """,
+                    (user_id,),
+                ).fetchall()
         return [dict(row) for row in rows]

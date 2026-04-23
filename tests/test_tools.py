@@ -4,7 +4,10 @@ from datetime import date
 from types import SimpleNamespace
 
 import pytest
+from mcp.server.auth.middleware.auth_context import auth_context_var
+from mcp.server.auth.middleware.bearer_auth import AuthenticatedUser
 
+from wai_music.auth.oauth import WaiAccessToken
 from wai_music.backends.base import BackendRegistry, SavedTracksPage
 from wai_music.cache import SQLiteCache
 from wai_music.models import Entity, EntityType, PlaylistRef, RelationRef, TrackMatch
@@ -154,6 +157,74 @@ def test_save_notes_writes_front_matter(settings, tmp_db_path) -> None:
             "# Notes\n\nEssential listening.",
             services=services,
         )
+
+
+def test_save_notes_and_playlist_history_are_user_scoped(settings, tmp_db_path) -> None:
+    services = SimpleNamespace(
+        settings=settings,
+        cache=SQLiteCache(tmp_db_path),
+        aggregator=FakeAggregator(),
+    )
+    settings.ensure_runtime_dirs()
+    token = auth_context_var.set(
+        AuthenticatedUser(
+            WaiAccessToken(
+                token="access-1",
+                client_id="client-1",
+                scopes=["mcp:tools"],
+                user_id="user-1",
+            )
+        )
+    )
+    try:
+        saved = save_markdown_notes(
+            "private-notes",
+            "# Notes\n\nUser scoped.",
+            services=services,
+        )
+    finally:
+        auth_context_var.reset(token)
+
+    assert saved.path.endswith(f"{date.today().isoformat()}-private-notes.md")
+    assert "/user-1/" in saved.path
+
+
+@pytest.mark.asyncio
+async def test_playlist_history_is_user_scoped(settings, tmp_db_path) -> None:
+    registry = BackendRegistry()
+    registry.register(FakeBackend())
+    services = SimpleNamespace(
+        aggregator=FakeAggregator(),
+        backends=registry,
+        cache=SQLiteCache(tmp_db_path),
+        musicbrainz=FakeMusicBrainz(),
+        settings=settings,
+    )
+
+    token = auth_context_var.set(
+        AuthenticatedUser(
+            WaiAccessToken(
+                token="access-1",
+                client_id="client-1",
+                scopes=["mcp:tools"],
+                user_id="user-1",
+            )
+        )
+    )
+    try:
+        await create_backend_playlist(
+            "spotify",
+            "Scoped Playlist",
+            "desc",
+            ["spotify:track:1"],
+            services=services,
+        )
+    finally:
+        auth_context_var.reset(token)
+
+    rows = services.cache.list_playlists(user_id="user-1")
+    assert len(rows) == 1
+    assert rows[0]["slug"] == "Scoped Playlist"
 
 
 @pytest.mark.asyncio

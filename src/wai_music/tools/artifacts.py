@@ -9,6 +9,7 @@ from json import dumps as json_dumps
 
 from mcp.server.fastmcp import FastMCP
 
+from wai_music.auth.current import current_user_id
 from wai_music.models import Entity, SavedNotes
 from wai_music.services import ServiceContainer
 
@@ -24,7 +25,12 @@ def save_markdown_notes(
 ) -> SavedNotes:
     if not SLUG_PATTERN.match(slug):
         raise ValueError("slug must match ^[a-z0-9]+(?:-[a-z0-9]+)*$")
-    target_path = services.settings.playlists_dir / f"{datetime.now().date().isoformat()}-{slug}.md"
+    user_id = current_user_id()
+    target_dir = services.settings.playlists_dir
+    if user_id is not None:
+        target_dir = target_dir / user_id
+        target_dir.mkdir(parents=True, exist_ok=True)
+    target_path = target_dir / f"{datetime.now().date().isoformat()}-{slug}.md"
     payload = _front_matter(slug, entities or [])
     contents = f"{payload}\n{markdown.strip()}\n"
     try:
