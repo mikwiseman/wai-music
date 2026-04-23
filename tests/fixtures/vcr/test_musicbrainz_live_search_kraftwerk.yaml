@@ -1,0 +1,79 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Host:
+      - musicbrainz.org
+      User-Agent:
+      - wai-music/0.1 (+https://github.com/mikwiseman/wai-music)
+    method: GET
+    uri: https://musicbrainz.org/ws/2/artist?query=Kraftwerk&fmt=json&limit=3
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAN1WvY7jNhB+FYG1GVDiv7vDXXBFUqTYKsEW/BnaysqSQUm3WCy2yTZ5gZR5gAAB
+        grTBdXkUB3mOULbX+ok3wAFJE1fiDPnNN+Q3M35ELoLpwKM1KkghMGG4oDdErKlcM/2ZJPRrtEKu
+        6esOrdUKNSG0kD7JCpnYlW3XovU3j6gcALgkxDvPsMupxizQHBtDAQuqCqtN0IQWCax72EPa/T42
+        /f68xMfzwGgeeBDYcl9gyqjHylKBZSGIDCFYyWw60LomJoCcJA612Q1YX0QTunuId4O7iR2+Yj/m
+        EB+S9d3naGAPBq3PzBWXvAje4Jw6hmluKLYAHBPgziZOuTd+ZP72jDTlToT3xADDysmEQKzFdkhA
+        c+/ABy1yD+jC9z3EnakfFmxHa1UGwO3e1ANDqP3wPnVfVU9PK2RhU9Z4Rp9QSPxVjh1NzBlnBisv
+        FXaKG85y7piGCf2ym3MXwatQaINpSgHTIjisFfEYjNDSCu2NVCP3d79/bFuofBPDgv/c8085lG1d
+        DsJB5PTLc85zIplGt4uDx2wTdq4lSaBTnPSGVWlaOClwSuTw3S+H558Ozz8cnr8/PKfvj8kyZvCa
+        u2qcqYYN35rLbQ2RVmgfy50ZtNPFHl6ewKe6edmQeE3WT6vHKzJsjjK8YnqJe4K6Gve0/NS4d0OQ
+        DzCNOzX9Z3GnZTfKTGlmgjUCJ6UKTF2RioXIIsnMWyGsJ8y65QXNiSI/kfGbY/vJjts//YWSzjqz
+        OUnn3N3GdhIbd4eGpM6eXF1cUIHrYlOXbrqBXfztQ91t981+6h2By9r3bRdLU83g8+nz9N0y/Bh9
+        c+wQU59cMps6+cXZgdvWzStBj5zxq6Rr6CHz0Het20J2D1V6iinQlbvJdn07v6ERDvrY7GGeBZlz
+        yRZc6MW9j80mQtuWHyC7/hQjlKtM2ugGsMzUPlte6yRDf4+ebgfXUajMaauFUZgUQeLUPwnWXiX5
+        aGeSVrXXhf735pgYefz5469//Pbza+1pWmE3zd1Dk01rZNlSmeSsUFzLv7XUeS9+md0FLdLQSsXJ
+        BMfMUYeNTIcEsURT6zl3asz5K4htU8+StgII5SHNPgcaU5qnISJ9wIpSLYs0EIkPY9IsVcxmIBJP
+        p6nw1NM0fRTVHlNIo1g5S3GhbbpNxYAZPfaGm22zM232ZbNN1VAvruZsXWWnXeglUHLthi7y//kn
+        4MvW7Gy56U1XNsOQ9LHf7SBmZT2TxusYt09/AeVnSEoBCgAA
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '948'
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 23 Apr 2026 06:37:49 GMT
+      Keep-Alive:
+      - timeout=15
+      X-Cache-Status:
+      - MISS
+      X-RateLimit-Limit:
+      - '1200'
+      X-RateLimit-Remaining:
+      - '911'
+      X-RateLimit-Reset:
+      - '1776926270'
+      content-encoding:
+      - gzip
+      content-security-policy:
+      - default-src 'none'; base-uri 'none'; connect-src 'self'; form-action 'self';
+        font-src 'self'; frame-ancestors 'none'; img-src 'self' data:; media-src 'self';
+        style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self';
+      etag:
+      - '"NzdkZTk0MDAwMDAwMDAwMFNvbHI=--gzip"'
+      last-modified:
+      - Thu, 23 Apr 2026 06:37:28 GMT
+      vary:
+      - Accept-Encoding
+      x-content-type-options:
+      - nosniff
+      x-frame-options:
+      - SAMEORIGIN
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+version: 1

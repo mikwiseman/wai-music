@@ -1,0 +1,97 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Host:
+      - musicbrainz.org
+      User-Agent:
+      - wai-music/0.1 (+https://github.com/mikwiseman/wai-music)
+    method: GET
+    uri: https://musicbrainz.org/ws/2/artist?query=Rachmaninoff&fmt=json&limit=3
+  response:
+    body:
+      string: !!binary |
+        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
+        tqvMc2yuDsDIgLTfg7//AnEh9AzdLgAA
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1962'
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 23 Apr 2026 06:37:48 GMT
+      Keep-Alive:
+      - timeout=15
+      X-Cache-Status:
+      - MISS
+      X-RateLimit-Limit:
+      - '1200'
+      X-RateLimit-Remaining:
+      - '453'
+      X-RateLimit-Reset:
+      - '1776926268'
+      content-encoding:
+      - gzip
+      content-security-policy:
+      - default-src 'none'; base-uri 'none'; connect-src 'self'; form-action 'self';
+        font-src 'self'; frame-ancestors 'none'; img-src 'self' data:; media-src 'self';
+        style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self';
+      etag:
+      - '"YzVjZTk0MDAwMDAwMDAwMFNvbHI=--gzip"'
+      last-modified:
+      - Thu, 23 Apr 2026 06:37:28 GMT
+      vary:
+      - Accept-Encoding
+      x-content-type-options:
+      - nosniff
+      x-frame-options:
+      - SAMEORIGIN
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+version: 1

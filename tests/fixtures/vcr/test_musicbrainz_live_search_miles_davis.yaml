@@ -1,0 +1,86 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Host:
+      - musicbrainz.org
+      User-Agent:
+      - wai-music/0.1 (+https://github.com/mikwiseman/wai-music)
+    method: GET
+    uri: https://musicbrainz.org/ws/2/artist?query=Miles+Davis&fmt=json&limit=3
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAN1XzY7jRBB+FcsXLmlku/9zW4EW7WERaHYlBJpDt7ucMevYwXZ2mF2txD4DHHkI
+        hIQA8RLhFXgSqp1M7CR2hp+ZPWxGGqW7qru++qqqq/I6TGswLbhwHiZRIkjESEKfRWJO5ZzpDxMu
+        vwxnYVqtyzacs4jrWVhlWQO4imahqdu8aZtw/tXrMPd3cBE7xZkhwiSKMGMkUanWhCYURApMpInB
+        +9qbFaD2Z1A3Vblbk+4CKyCiPGOEpoDHaJwSLV1GFKVaJjSykcvwQJNWNd4QRwhiAaWDenucCkcd
+        jQzqa0coOPyWWkoSbYFRxYAZjcdLs/T2n+YFNMHH5mXe+DuruiU7Sbc3CzqF8NYE7i9NAbd81De4
+        8fwi9DSACec7CpjSCD22RAiu0INIEq2kJFJzKxTnLNWqp+Cj3U1DDiLhXGSAIXSJRETWEsuoI5q7
+        FFymkWPonXhe5hi/4KLFMB67cSwr8gxIszKlR+t9QnPluijevJmFFhZ5SQ5coRpiGWsgicC8YJZr
+        YoVWxBkrU5MpbikduJK3h36IzKks0YZQdAdTIMNYqsgRMEJLvMgZqXo/HhVtlwtD/Ld753Dj8hC1
+        sybNEqBEAgXCUgCiFOLXWts40onimbk31BembE3wtCrz1ByBPxKd88HljVnafLE2bY4Oz8OvzatX
+        QVuvlytooZ4F1pSuAOP8dyyZxXWNga3x1nyV+/ILI/xIEWupeHiJ203Z7+MnTmLGZCS/8MIDJF3Y
+        0WKsffVzDHXYcdpt6ZhEmiRqu+URIyZAwKbITQPbwh/6vKsouIabbV0FT548OSm4E3FRpb6wOj5u
+        I7P9vqrzpfGVtl1uk9RhOt/u+PD36zez1+fquI+y0sxk1gh0Lhb42CRYbZFMMMrOCmFdxGw69VDc
+        okXbfR496p7CoDswgO35+o+we/PnDN8LTZsfNr9sft/8vPntz7ezYPPj5idc/bH5tYfQ7wVD5SEo
+        u7hfUD3p0IyFApqHzJzHh5lzYP3xUTz+v3GsytYstvW0a7bx3mhdpS9Cj+9EkhamafB5KYbihO/l
+        /hkZikh/FP/XeLIcvzhbly8mDmbrxr9RA2G0l+1erHFh96ad+JIcyk9vZ3uFVdW0xFaroVTspVem
+        dsGRNO6tLytniuCYkN66heOzB8DIMSO6D0JVnV586DY5dpv0hpfrkwieEIpP/ag4rZZICk5RE7Hq
+        KMXWEdhiDVNKyy6nXZfT4xAXUNULCBZo6Oo6n4i9Sdu8XIzL8rLxngA2xLuoCjo+clM2E4xc5Rhn
+        vA7M8hwpeXuURwN/HI68V4G98ddUL+AurVUJ6yW2cTNJoCvzxdVE2m8Tr/NqyiMILGDvqLIJA5Ry
+        wWUcxRT7+ITOlXFBBlO1t88jZPXSa3RNMAOZMA6SOElxvktNTBTgGCB0rBTNuEqiuO9wn9TVenXQ
+        RHGkjjOeCWK5Swj1M6qyVBCJ86LMssxKZvthXfaVPOinwefrvGwR9/QAPhvovI+T98n09/yiK5Jg
+        4RmfBb6yXkIQa87/+u57rrqKjrVguBLeo5NpD38XKcp4dGba43ww54l/PeEdRu6c7ME69EgSnWI5
+        lj4YmmdYxZ/CdTCe2v9I6UGx3YnrHWMaiw+cDx+8KzzfbA36GuPkA6HGYY1ovUu2znL14NOpOGja
+        43PT6EQ2NjYNOlJMpaLSksxwTphy2JFSxQnu4+NrqUmlvL+OJOQohxfw7V0Naa/yPvajSdlpGtDJ
+        NEjGAj02mnQJcol/fwMtxIDKjBQAAA==
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1333'
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 23 Apr 2026 06:37:49 GMT
+      Keep-Alive:
+      - timeout=15
+      X-Cache-Status:
+      - MISS
+      X-RateLimit-Limit:
+      - '1200'
+      X-RateLimit-Remaining:
+      - '1129'
+      X-RateLimit-Reset:
+      - '1776926270'
+      content-encoding:
+      - gzip
+      content-security-policy:
+      - default-src 'none'; base-uri 'none'; connect-src 'self'; form-action 'self';
+        font-src 'self'; frame-ancestors 'none'; img-src 'self' data:; media-src 'self';
+        style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self';
+      etag:
+      - '"NjlmYTk0MDAwMDAwMDAwMFNvbHI=--gzip"'
+      last-modified:
+      - Thu, 23 Apr 2026 06:37:28 GMT
+      vary:
+      - Accept-Encoding
+      x-content-type-options:
+      - nosniff
+      x-frame-options:
+      - SAMEORIGIN
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+version: 1

@@ -1,0 +1,53 @@
+"""Artifact generation tools."""
+
+from __future__ import annotations
+
+import re
+from datetime import datetime
+
+from mcp.server.fastmcp import FastMCP
+
+from wai_music.models import Entity, SavedNotes
+from wai_music.services import ServiceContainer
+
+SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+def save_markdown_notes(
+    slug: str,
+    markdown: str,
+    *,
+    services: ServiceContainer,
+    entities: list[Entity] | None = None,
+) -> SavedNotes:
+    if not SLUG_PATTERN.match(slug):
+        raise ValueError("slug must match ^[a-z0-9]+(?:-[a-z0-9]+)*$")
+    target_path = services.settings.playlists_dir / f"{datetime.now().date().isoformat()}-{slug}.md"
+    payload = _front_matter(slug, entities or [])
+    target_path.write_text(f"{payload}\n{markdown.strip()}\n", encoding="utf-8")
+    return SavedNotes(path=str(target_path), slug=slug, entities=entities or [])
+
+
+def _front_matter(slug: str, entities: list[Entity]) -> str:
+    lines = ["---", f"slug: {slug}", "entities:"]
+    if not entities:
+        lines.append("  []")
+    for entity in entities:
+        lines.append(f"  - type: {entity.type.value}")
+        lines.append(f'    name: "{entity.name}"')
+        if entity.mbid:
+            lines.append(f"    mbid: {entity.mbid}")
+    lines.append("---")
+    return "\n".join(lines)
+
+
+def register(mcp: FastMCP, services: ServiceContainer) -> None:
+    @mcp.tool()
+    async def save_notes(
+        slug: str,
+        markdown: str,
+        entities: list[Entity] | None = None,
+    ) -> SavedNotes:
+        """Write markdown liner notes into the configured playlists directory with front matter."""
+
+        return save_markdown_notes(slug, markdown, services=services, entities=entities)

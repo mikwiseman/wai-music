@@ -1,0 +1,17 @@
+.DS_Store
+.coverage
+.env
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+__pycache__/
+build/
+dist/
+htmlcov/
+playlists/*.md
+src/wai_music/data/scenes.index.json
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.pyc

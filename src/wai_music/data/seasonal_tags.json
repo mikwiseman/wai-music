@@ -1,0 +1,22 @@
+{
+  "season": {
+    "winter": ["classical", "ambient", "jazz"],
+    "spring": ["folk", "pop", "world"],
+    "summer": ["disco", "world", "pop", "electronic"],
+    "autumn": ["jazz", "rock", "hip-hop", "classical"]
+  },
+  "month": {
+    "1": ["introspective", "minimal"],
+    "2": ["warm", "lyrical"],
+    "3": ["renewal", "light"],
+    "4": ["clarity", "lyric"],
+    "5": ["bloom", "motion"],
+    "6": ["sunlit", "open-air"],
+    "7": ["heat", "groove"],
+    "8": ["travel", "late-summer"],
+    "9": ["study", "earthy"],
+    "10": ["dramatic", "shadow"],
+    "11": ["reflective", "nocturnal"],
+    "12": ["ceremonial", "glow"]
+  }
+}

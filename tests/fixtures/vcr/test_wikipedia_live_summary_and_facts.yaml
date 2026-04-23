@@ -1,0 +1,192 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      Accept:
+      - application/json
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Host:
+      - en.wikipedia.org
+      User-Agent:
+      - wai-music/0.1 (+https://github.com/mikwiseman/wai-music)
+    method: GET
+    uri: https://en.wikipedia.org/api/rest_v1/page/summary/Sergei_Rachmaninoff
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA+1Wy4ojNxT9FVGbJOByuR7tto3HWQUCWaXTZBEajFylqrqxXkgqdztDIP+QP8yX
+        5Kg8ttOTDj1kYJjF4IVU0n2dc48kv03C0YpklfjAdcNdk0ySQEHGpZ+E6wSxO173imvSpm2x25C3
+        kh/PRmtvuWaS6+7NQyL0Q8IacpjK4B6SzWm3ltx7rKnH1PJOpKNvqjjBfPNClnUW3TbvBuTUXAnM
+        ayR8m1CTrGaoUjwF5E9+nySPtKcd92JLQSis/ZiX+WKen6H46FVzbTTVXF6Abd8Dpo1TXNJvonkN
+        +6eBDWDRLcJdLssqQu4HtdOcZATkzeAiIUkfgvWrLBusNLyZRjKUaIhPjeuy+GXjV1YbpYz22Rgk
+        w09kL/CwrW0/LXk1u7m9mf5qu6wsZ/Yp/QDLJPahCX2ygssk6QV1PRpU5UsAMY460mBXAdHHVP+h
+        dV+ryfPb+bWcvFoWqCc2DsmFHpvqMEXjMHfiQJ6MxkJeVstFUVSLm1FHURRtUbfVclem5W45T/O8
+        zdNlNVukhZjP50V+W9yU5WgMtQauLFyKWTFPZ1WaL+9nxaqoVjflLzGn8LUjG06p7gbvKQrGKGu8
+        cAxHkVmskA/s63xxW/71x5/5siq/ee66vbAoTVT2JKmNDkKH7eDkqHoY74OxcWpH5i98Cz29sHvh
+        Onv5ZJxZ8f/H/1tex1rf9ABj3BHh4BI+JtLoD5q53L8a5h5Gq5dQQQTK7EiKT8eNFTVxufr+RMR/
+        xPs8yAE7uF4dYl7vwp+5J3kE3Lp/dm2xR+4ZZ++LeMIO5MJgvDlLeTLqGhJthhoMTJ9HIc9wYoU8
+        RguPmRMNM1ow07LQC9aSxqk6x/JxGZJiDT/GsIgdi7gm/4cnruHAOid4YE5YJzxOCA90EGOQO4MS
+        AtXkFSN9hREv7/heMDVgnLLvuENtpFs5CF2ffO/rntPeHPz+OGF3pDCmPxjnOdZOaA0KcP/ixrOO
+        HwSIO7JgUHbojTND1yOBxa7BTcmoIaOYNoHvJNAbxwiosdelkvaCKSFNM5Y9YeIpwvKABI78hDVC
+        exF5RAvtALSSxedygNGpLBebaFzdg1KH3dpIXCV+yu7BV6TYxH60oGyIbbDOKNCvw8jAs7595d+h
+        oig/hDJDsEMYsyDW4OEe++T3JKU/dQkYgUeBGKBvB4moQCCNE2O/rmjGKEHU/fhyM2TxhDOLVCf+
+        ozVpQBgUipsmF9Vu+6DiS7+2m/Vu84qA19lu80XEX0T8eYh4nVn89/sbZytgy5gLAAA=
+    headers:
+      accept-ranges:
+      - bytes
+      access-control-allow-headers:
+      - accept, content-type, content-length, cache-control, accept-language, api-user-agent,
+        if-match, if-modified-since, if-none-match, dnt, accept-encoding
+      access-control-allow-methods:
+      - GET,HEAD
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - etag
+      age:
+      - '0'
+      cache-control:
+      - s-maxage=1209600, max-age=300
+      content-encoding:
+      - gzip
+      content-language:
+      - en
+      content-security-policy:
+      - default-src 'none'; frame-ancestors 'none'
+      content-type:
+      - application/json; charset=utf-8; profile="https://www.mediawiki.org/wiki/Specs/Summary/1.5.0"
+      date:
+      - Thu, 23 Apr 2026 06:37:50 GMT
+      etag:
+      - W/"1349822485/d92aca70-3ebc-11f1-af86-a4db39f00e6f"
+      nel:
+      - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
+        0.0}'
+      referrer-policy:
+      - origin-when-cross-origin
+      report-to:
+      - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
+        }] }'
+      server:
+      - production-tls
+      server-timing:
+      - cache;desc="miss", host;desc="cp3070"
+      set-cookie:
+      - WMF-Last-Access=23-Apr-2026;Path=/;HttpOnly;secure;Expires=Mon, 25 May 2026
+        00:00:00 GMT
+      - WMF-Last-Access-Global=23-Apr-2026;Path=/;Domain=.wikipedia.org;HttpOnly;secure;Expires=Mon,
+        25 May 2026 00:00:00 GMT
+      - GeoIP=NL:NH:Amsterdam:52.35:4.94:v4; Path=/; secure; Domain=.wikipedia.org
+      - NetworkProbeLimit=0.001;Path=/;Secure;SameSite=None;Max-Age=3600
+      - WMF-Uniq=ru2oZOLC9vAeYiJFSRnjPgNLAAAAAFvdxGzHVAhk8SG-kNqjkP_UmwvPuq_T-u01;Domain=.wikipedia.org;Path=/;HttpOnly;secure;SameSite=None;Expires=Fri,
+        23 Apr 2027 00:00:00 GMT
+      strict-transport-security:
+      - max-age=106384710; includeSubDomains; preload
+      transfer-encoding:
+      - chunked
+      vary:
+      - Accept-Language, x-restbase-compat, Accept-Encoding
+      x-analytics:
+      - ''
+      x-cache:
+      - cp3070 miss, cp3070 miss
+      x-cache-status:
+      - miss
+      x-client-ip:
+      - 83.229.82.205
+      x-content-security-policy:
+      - default-src 'none'; frame-ancestors 'none'
+      x-content-type-options:
+      - nosniff
+      x-frame-options:
+      - SAMEORIGIN
+      x-request-id:
+      - 6f12c056-de99-4fb9-bf15-3168f825a21e
+      x-webkit-csp:
+      - default-src 'none'; frame-ancestors 'none'
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: ''
+    headers:
+      Accept:
+      - application/sparql-results+json
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Host:
+      - query.wikidata.org
+      User-Agent:
+      - wai-music/0.1 (+https://github.com/mikwiseman/wai-music)
+    method: GET
+    uri: https://query.wikidata.org/sparql?format=json&query=SELECT+%3FitemLabel+%3Fbirth+%3Fdeath+%3Finception+%3Farticle+WHERE+%7B%0A++++++++++VALUES+%3Fitem+%7B+wd%3AQ131861+%7D%0A++++++++++OPTIONAL+%7B+%3Fitem+wdt%3AP569+%3Fbirth+.+%7D%0A++++++++++OPTIONAL+%7B+%3Fitem+wdt%3AP570+%3Fdeath+.+%7D%0A++++++++++OPTIONAL+%7B+%3Fitem+wdt%3AP571+%3Finception+.+%7D%0A++++++++++OPTIONAL+%7B%0A++++++++++++%3Farticle+schema%3Aabout+%3Fitem+%3B%0A+++++++++++++++++++++schema%3AisPartOf+%3Chttps%3A%2F%2Fen.wikipedia.org%2F%3E+.%0A++++++++++%7D%0A++++++++++SERVICE+wikibase%3Alabel+%7B+bd%3AserviceParam+wikibase%3Alanguage+%22en%2Cen%22.+%7D%0A++++++++%7D%0A++++++++LIMIT+1
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA8VSTWvDMAy991cY75rPprAuv6G7rD2MjTGURE3EHCc4TrNR8t9nJ2nasjLYaWCw
+        niy992R0XDDGC4SMs5gdDTDwAKqx8JVx0lhuIEHBHcYTUrqwQYYwBiRTrDVV0gJQmlKBnL0Zmt6x
+        xAqbVujmgjshmZHMJ/4xyU7Uc9mQy0CD/qrRpnmhdR37ftd1Xhd5lcr9ZRCE/vPjZpsWWMKdqcYd
+        lcidM8PcLcwcCsTl2wFEOz6G6/vIDVZuEO6CIB7OC58K+1PHNPM/OXxYGYeRu1z/5nD+/yuPs0Kr
+        6Da7Nd4Y5yi9jj6oxoxg8G+Rv0WVI70/QVqUIElW+/1P6fOaXIt/liIWIPNBB+XfJx/V2U314e7H
+        bVv037LWARPJAgAA
+    headers:
+      accept-ranges:
+      - bytes
+      access-control-allow-headers:
+      - accept, content-type, content-length, user-agent, api-user-agent
+      access-control-allow-origin:
+      - '*'
+      age:
+      - '0'
+      cache-control:
+      - public, max-age=300
+      content-encoding:
+      - gzip
+      content-length:
+      - '297'
+      content-type:
+      - application/sparql-results+json;charset=utf-8
+      date:
+      - Thu, 23 Apr 2026 06:37:50 GMT
+      nel:
+      - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
+        0.0}'
+      report-to:
+      - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
+        }] }'
+      server:
+      - nginx/1.18.0
+      server-timing:
+      - cache;desc="pass", host;desc="cp3070"
+      set-cookie:
+      - WMF-Uniq=Ap00z_p4gd979ar8-GnpSwNLAAAAAFvdbq-q4NwLW-AfIO74B0Y8ionWUZ9uIYQh;Domain=.wikidata.org;Path=/;HttpOnly;secure;SameSite=None;Expires=Fri,
+        23 Apr 2027 00:00:00 GMT
+      strict-transport-security:
+      - max-age=106384710; includeSubDomains; preload
+      vary:
+      - Accept, Accept-Encoding
+      x-analytics:
+      - ''
+      x-cache:
+      - cp3070 miss, cp3070 pass
+      x-cache-status:
+      - pass
+      x-client-ip:
+      - 83.229.82.205
+      x-first-solution-millis:
+      - '2'
+      x-request-id:
+      - fd638c74-8144-48e9-b67e-ecec6913e38a
+      x-served-by:
+      - wdqs1020
+    status:
+      code: 200
+      message: OK
+version: 1
