@@ -28,6 +28,7 @@ dependencies = [
   "pydantic-settings>=2.14,<3",
   "structlog>=25.5,<26",
   "cryptography>=46.0.7,<47",
+  "sentry-sdk[httpx,mcp,starlette]>=2.58,<3",
 ]
 
 [project.optional-dependencies]

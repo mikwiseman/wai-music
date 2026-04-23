@@ -6,6 +6,7 @@ from mcp.server.fastmcp import FastMCP
 
 from wai_music.models import EntityType, Fact, Story
 from wai_music.services import ServiceContainer
+from wai_music.tools.annotations import READ_ONLY_TOOL
 
 
 async def build_story(
@@ -23,7 +24,7 @@ async def build_story(
 
 
 def register(mcp: FastMCP, services: ServiceContainer) -> None:
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_TOOL)
     async def get_artist_story(
         mbid: str,
         angle: str | None = None,
@@ -43,7 +44,7 @@ def register(mcp: FastMCP, services: ServiceContainer) -> None:
             )
         return story
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_TOOL)
     async def get_release_story(mbid: str, language: str | None = None) -> Story:
         """Return a hybrid release story with structured facts and raw Wikipedia extract."""
 
@@ -51,7 +52,7 @@ def register(mcp: FastMCP, services: ServiceContainer) -> None:
             mbid, entity_type=EntityType.RELEASE, services=services, language=language
         )
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_TOOL)
     async def get_recording_story(mbid: str, language: str | None = None) -> Story:
         """Return a hybrid recording story with structured facts and raw Wikipedia extract."""
 
@@ -59,7 +60,7 @@ def register(mcp: FastMCP, services: ServiceContainer) -> None:
             mbid, entity_type=EntityType.RECORDING, services=services, language=language
         )
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_TOOL)
     async def get_scene_story(scene_key: str, language: str | None = None) -> Story:
         """Return a hybrid scene story using curated data and Wikipedia context."""
 

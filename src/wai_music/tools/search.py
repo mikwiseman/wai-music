@@ -6,6 +6,7 @@ from mcp.server.fastmcp import FastMCP
 
 from wai_music.models import Entity, EntityType
 from wai_music.services import ServiceContainer
+from wai_music.tools.annotations import READ_ONLY_TOOL
 
 
 async def search_entities(
@@ -32,13 +33,13 @@ async def resolve_identifier(
 
 
 def register(mcp: FastMCP, services: ServiceContainer) -> None:
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_TOOL)
     async def search(query: str, type: str | None = None, limit: int = 5) -> list[Entity]:
         """Search artists, releases, recordings, or works via MusicBrainz."""
 
         return await search_entities(query, services=services, entity_type=type, limit=limit)
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_TOOL)
     async def resolve(identifier: str, language: str | None = None) -> Entity:
         """Resolve a MusicBrainz MBID or external URL/identifier into a canonical entity."""
 

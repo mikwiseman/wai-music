@@ -102,6 +102,12 @@ class WaiMusicSettings(BaseSettings):
         default=60 * 10,
         alias="WAI_MUSIC_SPOTIFY_OAUTH_STATE_TTL_SECONDS",
     )
+    sentry_dsn: str | None = Field(default=None, alias="WAI_MUSIC_SENTRY_DSN")
+    sentry_environment: str | None = Field(default=None, alias="WAI_MUSIC_SENTRY_ENVIRONMENT")
+    sentry_traces_sample_rate: float = Field(
+        default=0.0,
+        alias="WAI_MUSIC_SENTRY_TRACES_SAMPLE_RATE",
+    )
 
     @field_validator("spotify_cache_path", "db_path", "playlists_dir", mode="before")
     @classmethod
@@ -179,6 +185,12 @@ class WaiMusicSettings(BaseSettings):
     @property
     def oauth_required_scopes(self) -> list[str]:
         return ["mcp:tools"]
+
+    @property
+    def effective_sentry_environment(self) -> str:
+        if self.sentry_environment:
+            return self.sentry_environment
+        return "production" if self.public_base_url else "development"
 
     def ensure_runtime_dirs(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)

@@ -10,10 +10,13 @@ from json import dumps as json_dumps
 from mcp.server.fastmcp import FastMCP
 
 from wai_music.auth.current import current_user_id
+from wai_music.logging_config import get_logger
 from wai_music.models import Entity, SavedNotes
 from wai_music.services import ServiceContainer
+from wai_music.tools.annotations import LOCAL_WRITE_TOOL
 
 SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+logger = get_logger(__name__)
 
 
 def save_markdown_notes(
@@ -39,7 +42,20 @@ def save_markdown_notes(
             handle.flush()
             os.fsync(handle.fileno())
     except FileExistsError as exc:
+        logger.warning(
+            "save_notes_conflict",
+            slug=slug,
+            path=str(target_path),
+            user_id=user_id,
+        )
         raise FileExistsError(f"notes already exist for slug {slug!r} on this date") from exc
+    logger.info(
+        "save_notes_succeeded",
+        slug=slug,
+        path=str(target_path),
+        user_id=user_id,
+        entity_count=len(entities or []),
+    )
     return SavedNotes(path=str(target_path), slug=slug, entities=entities or [])
 
 
@@ -57,7 +73,7 @@ def _front_matter(slug: str, entities: list[Entity]) -> str:
 
 
 def register(mcp: FastMCP, services: ServiceContainer) -> None:
-    @mcp.tool()
+    @mcp.tool(annotations=LOCAL_WRITE_TOOL)
     async def save_notes(
         slug: str,
         markdown: str,

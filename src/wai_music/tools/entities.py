@@ -6,6 +6,7 @@ from mcp.server.fastmcp import FastMCP
 
 from wai_music.models import Entity, EntityType
 from wai_music.services import ServiceContainer
+from wai_music.tools.annotations import READ_ONLY_TOOL
 
 
 async def get_entity(
@@ -23,7 +24,7 @@ async def get_entity(
 
 
 def register(mcp: FastMCP, services: ServiceContainer) -> None:
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_TOOL)
     async def get_artist(mbid: str, language: str | None = None) -> Entity:
         """Get a canonical artist profile from MusicBrainz and Wikipedia."""
 
@@ -31,7 +32,7 @@ def register(mcp: FastMCP, services: ServiceContainer) -> None:
             mbid, entity_type=EntityType.ARTIST, services=services, language=language
         )
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_TOOL)
     async def get_release(mbid: str, language: str | None = None) -> Entity:
         """Get a canonical release profile, including tracklist where available."""
 
@@ -39,7 +40,7 @@ def register(mcp: FastMCP, services: ServiceContainer) -> None:
             mbid, entity_type=EntityType.RELEASE, services=services, language=language
         )
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_TOOL)
     async def get_recording(mbid: str, language: str | None = None) -> Entity:
         """Get a canonical recording profile and release context."""
 
@@ -47,7 +48,7 @@ def register(mcp: FastMCP, services: ServiceContainer) -> None:
             mbid, entity_type=EntityType.RECORDING, services=services, language=language
         )
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_TOOL)
     async def get_work(mbid: str, language: str | None = None) -> Entity:
         """Get a canonical work profile and known performance recordings."""
 

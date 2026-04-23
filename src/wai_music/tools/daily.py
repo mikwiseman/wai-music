@@ -19,6 +19,7 @@ from wai_music.data import (
 from wai_music.languages import validate_language
 from wai_music.models import DailyMode, DailyPick, Entity, EntityType
 from wai_music.services import ServiceContainer
+from wai_music.tools.annotations import READ_ONLY_TOOL
 
 
 @dataclass(frozen=True)
@@ -235,7 +236,7 @@ async def composition_pick(
 
 
 def register(mcp: FastMCP, services: ServiceContainer) -> None:
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_TOOL)
     async def composition_of_the_day(
         mode: str | None = None,
         date: str | None = None,

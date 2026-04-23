@@ -7,6 +7,7 @@ from mcp.server.fastmcp import FastMCP
 from wai_music.backends.base import SavedTracksPage
 from wai_music.models import Entity, EntityType, ExternalIds, ListeningProfile, TrackMatch
 from wai_music.services import ServiceContainer
+from wai_music.tools.annotations import READ_ONLY_TOOL
 
 
 def _infer_eras(track_names: list[TrackMatch]) -> list[str]:
@@ -96,7 +97,7 @@ async def build_profile(
 
 
 def register(mcp: FastMCP, services: ServiceContainer) -> None:
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_TOOL)
     async def get_listening_profile(
         backend: str = "spotify",
         time_range: str = "medium_term",

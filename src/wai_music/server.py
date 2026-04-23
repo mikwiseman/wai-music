@@ -18,6 +18,7 @@ from wai_music.auth.oauth import WaiOAuthProvider, build_auth_settings
 from wai_music.logging_config import configure_logging
 from wai_music.services import ServiceContainer, create_services
 from wai_music.settings import WaiMusicSettings
+from wai_music.telemetry import configure_sentry
 from wai_music.tools import artifacts, daily, entities, playback, profile, related, search, stories
 from wai_music.web import build_web_routes
 
@@ -132,6 +133,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         settings.host = args.host
     if args.port is not None:
         settings.port = args.port
+    configure_sentry(settings)
     services = create_services(settings)
     transport: Literal["stdio", "streamable-http"] = "streamable-http" if args.http else "stdio"
     if transport == "stdio":

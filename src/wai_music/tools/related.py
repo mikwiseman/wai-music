@@ -6,6 +6,7 @@ from mcp.server.fastmcp import FastMCP
 
 from wai_music.models import RelationRef
 from wai_music.services import ServiceContainer
+from wai_music.tools.annotations import READ_ONLY_TOOL
 
 
 async def get_related_entities(
@@ -22,7 +23,7 @@ async def get_related_entities(
 
 
 def register(mcp: FastMCP, services: ServiceContainer) -> None:
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY_TOOL)
     async def get_related(mbid: str, kind: str | None = None) -> list[RelationRef]:
         """Return structural MusicBrainz relations such as collaborations and influences."""
 

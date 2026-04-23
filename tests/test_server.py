@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 
 from mcp.server.fastmcp import FastMCP
+from mcp.types import Tool
 
 from wai_music.server import build_parser, build_server
 
@@ -12,15 +14,51 @@ async def _list_tool_names(server: FastMCP) -> list[str]:
     return sorted(tool.name for tool in tools)
 
 
+async def _tool_by_name(server: FastMCP, name: str) -> Tool:
+    tools = await server.list_tools()
+    for tool in tools:
+        if tool.name == name:
+            return tool
+    raise AssertionError(f"tool {name!r} was not registered")
+
+
 def test_server_parser_and_builder() -> None:
     args = build_parser().parse_args(["--http", "--port", "9999"])
     services = SimpleNamespace(close=lambda: None)
 
     server = build_server(services, port=args.port)
-    tool_names = __import__("asyncio").run(_list_tool_names(server))
+    tool_names = asyncio.run(_list_tool_names(server))
 
     assert args.http is True
     assert args.port == 9999
     assert isinstance(server, FastMCP)
     assert len(tool_names) == 17
     assert "health_check" not in tool_names
+
+
+def test_server_registers_tool_safety_annotations() -> None:
+    server = build_server(SimpleNamespace(close=lambda: None))
+
+    search_tool = asyncio.run(_tool_by_name(server, "search"))
+    create_playlist_tool = asyncio.run(_tool_by_name(server, "create_playlist"))
+    add_tracks_tool = asyncio.run(_tool_by_name(server, "add_tracks_to_playlist"))
+    save_notes_tool = asyncio.run(_tool_by_name(server, "save_notes"))
+
+    assert search_tool.annotations is not None
+    assert search_tool.annotations.readOnlyHint is True
+    assert search_tool.annotations.destructiveHint is False
+
+    assert create_playlist_tool.annotations is not None
+    assert create_playlist_tool.annotations.readOnlyHint is False
+    assert create_playlist_tool.annotations.destructiveHint is True
+    assert create_playlist_tool.annotations.openWorldHint is True
+
+    assert add_tracks_tool.annotations is not None
+    assert add_tracks_tool.annotations.readOnlyHint is False
+    assert add_tracks_tool.annotations.destructiveHint is True
+    assert add_tracks_tool.annotations.openWorldHint is True
+
+    assert save_notes_tool.annotations is not None
+    assert save_notes_tool.annotations.readOnlyHint is False
+    assert save_notes_tool.annotations.destructiveHint is True
+    assert save_notes_tool.annotations.openWorldHint is False
