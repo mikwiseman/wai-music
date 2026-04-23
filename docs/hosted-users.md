@@ -61,6 +61,22 @@ Users do not need:
 
 The server already supports OAuth-based remote MCP auth, which is the correct model for `claude.ai`.
 
+## Personal access tokens
+
+The dashboard also exposes personal access tokens for advanced use cases:
+
+- manual MCP testing with `curl`
+- MCP Inspector
+- clients that do not support OAuth yet
+
+These tokens are:
+
+- generated per user
+- shown only once at creation time
+- revocable from the dashboard
+
+They are not the recommended path for Claude. For `claude.ai`, users should use the OAuth connector flow instead.
+
 ## What actually happens during auth
 
 When Claude first reaches `https://music.waiwai.is/mcp`:

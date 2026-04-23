@@ -66,6 +66,10 @@ class WaiMusicSettings(BaseSettings):
         default=60 * 5,
         alias="WAI_MUSIC_OAUTH_AUTHORIZATION_CODE_TTL_SECONDS",
     )
+    personal_access_token_ttl_seconds: int = Field(
+        default=60 * 60 * 24 * 30,
+        alias="WAI_MUSIC_PERSONAL_ACCESS_TOKEN_TTL_SECONDS",
+    )
     spotify_oauth_state_ttl_seconds: int = Field(
         default=60 * 10,
         alias="WAI_MUSIC_SPOTIFY_OAUTH_STATE_TTL_SECONDS",

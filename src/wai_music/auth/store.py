@@ -56,6 +56,16 @@ class PendingAuthorization:
     expires_at: int
 
 
+@dataclass(frozen=True)
+class PersonalAccessTokenRecord:
+    token_fingerprint: str
+    user_id: str
+    label: str
+    created_at: str
+    expires_at: int
+    last4: str
+
+
 class SQLiteAuthStore:
     def __init__(self, path: str | Path, *, secret_key: str) -> None:
         self.path = Path(path).expanduser()
@@ -161,6 +171,19 @@ class SQLiteAuthStore:
                 CREATE TABLE IF NOT EXISTS oauth_refresh_tokens (
                     token_fingerprint TEXT PRIMARY KEY,
                     payload_json TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS personal_access_tokens (
+                    token_fingerprint TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    label TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    expires_at INTEGER NOT NULL,
+                    last4 TEXT NOT NULL,
+                    FOREIGN KEY(user_id) REFERENCES auth_users(user_id)
                 )
                 """
             )
@@ -523,6 +546,128 @@ class SQLiteAuthStore:
             scope=" ".join(scopes),
         )
 
+    def create_personal_access_token(
+        self,
+        *,
+        user_id: str,
+        label: str,
+        ttl_seconds: int,
+        scopes: list[str],
+        resource: str | None = None,
+    ) -> tuple[PersonalAccessTokenRecord, str]:
+        normalized_label = label.strip()
+        if not normalized_label:
+            raise ValueError("token label is required")
+        if len(normalized_label) > 80:
+            raise ValueError("token label must be 80 characters or fewer")
+        raw_token = new_opaque_token()
+        created_at = datetime.now(UTC).isoformat()
+        expires_at = int(time.time()) + ttl_seconds
+        fingerprint = token_fingerprint(raw_token)
+        payload = {
+            "client_id": "personal-access-token",
+            "user_id": user_id,
+            "scopes": scopes,
+            "expires_at": expires_at,
+            "resource": resource,
+            "kind": "personal_access_token",
+            "label": normalized_label,
+        }
+        record = PersonalAccessTokenRecord(
+            token_fingerprint=fingerprint,
+            user_id=user_id,
+            label=normalized_label,
+            created_at=created_at,
+            expires_at=expires_at,
+            last4=raw_token[-4:],
+        )
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO oauth_access_tokens(token_fingerprint, payload_json)
+                VALUES(?, ?)
+                """,
+                (fingerprint, json.dumps(payload)),
+            )
+            connection.execute(
+                """
+                INSERT INTO personal_access_tokens(
+                    token_fingerprint,
+                    user_id,
+                    label,
+                    created_at,
+                    expires_at,
+                    last4
+                )
+                VALUES(?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.token_fingerprint,
+                    record.user_id,
+                    record.label,
+                    record.created_at,
+                    record.expires_at,
+                    record.last4,
+                ),
+            )
+        return record, raw_token
+
+    def list_personal_access_tokens(self, user_id: str) -> list[PersonalAccessTokenRecord]:
+        now = int(time.time())
+        with self._connect() as connection:
+            expired_rows = connection.execute(
+                """
+                SELECT token_fingerprint
+                FROM personal_access_tokens
+                WHERE user_id = ? AND expires_at < ?
+                """,
+                (user_id, now),
+            ).fetchall()
+            for row in expired_rows:
+                fingerprint = str(row["token_fingerprint"])
+                connection.execute(
+                    "DELETE FROM personal_access_tokens WHERE token_fingerprint = ?",
+                    (fingerprint,),
+                )
+                connection.execute(
+                    "DELETE FROM oauth_access_tokens WHERE token_fingerprint = ?",
+                    (fingerprint,),
+                )
+            rows = connection.execute(
+                """
+                SELECT token_fingerprint, user_id, label, created_at, expires_at, last4
+                FROM personal_access_tokens
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+                """,
+                (user_id,),
+            ).fetchall()
+        return [
+            PersonalAccessTokenRecord(
+                token_fingerprint=str(row["token_fingerprint"]),
+                user_id=str(row["user_id"]),
+                label=str(row["label"]),
+                created_at=str(row["created_at"]),
+                expires_at=int(row["expires_at"]),
+                last4=str(row["last4"]),
+            )
+            for row in rows
+        ]
+
+    def revoke_personal_access_token(self, *, user_id: str, token_fingerprint_value: str) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                DELETE FROM personal_access_tokens
+                WHERE token_fingerprint = ? AND user_id = ?
+                """,
+                (token_fingerprint_value, user_id),
+            )
+            connection.execute(
+                "DELETE FROM oauth_access_tokens WHERE token_fingerprint = ?",
+                (token_fingerprint_value,),
+            )
+
     def get_access_token_payload(self, token: str) -> dict[str, Any] | None:
         with self._connect() as connection:
             row = connection.execute(
@@ -539,6 +684,13 @@ class SQLiteAuthStore:
         if not isinstance(payload, dict):
             raise ValueError("access token payload must be a JSON object")
         return payload
+
+    def delete_access_token(self, token: str) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                "DELETE FROM oauth_access_tokens WHERE token_fingerprint = ?",
+                (token_fingerprint(token),),
+            )
 
     def get_refresh_token_payload(self, token: str) -> dict[str, Any] | None:
         with self._connect() as connection:

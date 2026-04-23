@@ -94,3 +94,30 @@ def test_auth_store_oauth_and_spotify_storage(tmp_path: Path) -> None:
     assert access_payload["user_id"] == user.user_id
     assert refresh_payload is not None
     assert refresh_payload["client_id"] == "client-1"
+
+
+def test_personal_access_tokens_round_trip(tmp_path: Path) -> None:
+    store = SQLiteAuthStore(tmp_path / "auth.sqlite", secret_key="test-secret-key")
+    user = store.create_user(email="pat@example.com", password="correct horse battery staple")
+
+    record, raw_token = store.create_personal_access_token(
+        user_id=user.user_id,
+        label="curl test",
+        ttl_seconds=3600,
+        scopes=["mcp:tools"],
+        resource="https://music.example.com/mcp",
+    )
+    listed = store.list_personal_access_tokens(user.user_id)
+    payload = store.get_access_token_payload(raw_token)
+
+    assert listed == [record]
+    assert payload is not None
+    assert payload["user_id"] == user.user_id
+    assert payload["client_id"] == "personal-access-token"
+
+    store.revoke_personal_access_token(
+        user_id=user.user_id,
+        token_fingerprint_value=record.token_fingerprint,
+    )
+    assert store.list_personal_access_tokens(user.user_id) == []
+    assert store.get_access_token_payload(raw_token) is None

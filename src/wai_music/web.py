@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from html import escape
 from urllib.parse import parse_qs, quote
 
@@ -223,77 +224,58 @@ def build_web_routes(
         session = _require_session(request, services=services, settings=settings)
         if isinstance(session, Response):
             return session
-        spotify = services.auth_store.get_spotify_connection(session.user_id)
-        recent_playlists = services.cache.list_playlists(user_id=session.user_id)[-5:]
-        spotify_markup = (
-            f"""
-            <p>Connected as <strong>{escape(spotify.spotify_user_id)}</strong>.</p>
-            <p class="muted">Last updated: {escape(spotify.updated_at)}</p>
-            <div class="actions">
-              <a class="button" href="/spotify/connect">Reconnect Spotify</a>
-            </div>
-            """
-            if spotify is not None
-            else """
-            <p>Spotify is not connected yet.</p>
-            <div class="actions">
-              <a class="button" href="/spotify/connect">Connect Spotify</a>
-            </div>
-            """
-        )
-        playlists_markup = (
-            "<ul>"
-            + "".join(
-                f"<li><strong>{escape(item['slug'])}</strong> "
-                f'<span class="muted">{escape(item["playlist_id"])}</span></li>'
-                for item in recent_playlists
+        return HTMLResponse(
+            _dashboard_page(
+                session,
+                services=services,
+                settings=settings,
             )
-            + "</ul>"
-            if recent_playlists
-            else '<p class="muted">No playlist history recorded yet.</p>'
         )
-        mcp_url = _mcp_url(settings)
-        body = f"""
-        <section class="hero">
-          <p class="eyebrow">Dashboard</p>
-          <h1>{escape(session.email)}</h1>
-          <p>
-            This account owns a separate Spotify integration and receives user-scoped MCP access
-            through OAuth. The MCP endpoint below is the URL you add in Claude.
-          </p>
-          <div class="actions">
-            <a class="button secondary" href="/spotify/connect">Spotify settings</a>
-            <form method="post" action="/logout"><button class="secondary" type="submit">Sign out</button></form>
-          </div>
-        </section>
-        <section class="grid">
-          <article class="card">
-            <h2>Spotify</h2>
-            {spotify_markup}
-          </article>
-          <article class="card">
-            <h2>MCP Endpoint</h2>
-            <p class="mono">{escape(mcp_url)}</p>
-            <p class="muted">
-              Claude will discover OAuth metadata automatically from this service.
-            </p>
-          </article>
-          <article class="card">
-            <h2>Connect Claude</h2>
-            <ol>
-              <li>Add a custom connector in Claude with the MCP endpoint above.</li>
-              <li>Leave advanced OAuth client settings empty.</li>
-              <li>No API key or manual token is required for the normal flow.</li>
-              <li>Claude will redirect you back here for sign-in and approval.</li>
-            </ol>
-          </article>
-          <article class="card">
-            <h2>Recent Playlists</h2>
-            {playlists_markup}
-          </article>
-        </section>
-        """
-        return HTMLResponse(_page("Dashboard", body))
+
+    async def create_personal_token(request: Request) -> Response:
+        session = _require_session(request, services=services, settings=settings)
+        if isinstance(session, Response):
+            return session
+        form = await _parse_form(request)
+        try:
+            _record, raw_token = services.auth_store.create_personal_access_token(
+                user_id=session.user_id,
+                label=form.get("label", ""),
+                ttl_seconds=settings.personal_access_token_ttl_seconds,
+                scopes=settings.oauth_required_scopes,
+                resource=settings.oauth_resource_server_url,
+            )
+        except ValueError as exc:
+            return HTMLResponse(
+                _dashboard_page(
+                    session,
+                    services=services,
+                    settings=settings,
+                    token_error=str(exc),
+                ),
+                status_code=400,
+            )
+        return HTMLResponse(
+            _dashboard_page(
+                session,
+                services=services,
+                settings=settings,
+                created_token=raw_token,
+            )
+        )
+
+    async def revoke_personal_token(request: Request) -> Response:
+        session = _require_session(request, services=services, settings=settings)
+        if isinstance(session, Response):
+            return session
+        form = await _parse_form(request)
+        token_fingerprint_value = form.get("token_fingerprint", "").strip()
+        if token_fingerprint_value:
+            services.auth_store.revoke_personal_access_token(
+                user_id=session.user_id,
+                token_fingerprint_value=token_fingerprint_value,
+            )
+        return RedirectResponse("/dashboard", status_code=303)
 
     async def spotify_connect(request: Request) -> Response:
         session = _require_session(request, services=services, settings=settings)
@@ -466,11 +448,148 @@ def build_web_routes(
         Route("/sign-in", endpoint=sign_in, methods=["GET", "POST"]),
         Route("/logout", endpoint=logout, methods=["POST"]),
         Route("/dashboard", endpoint=dashboard, methods=["GET"]),
+        Route("/tokens/create", endpoint=create_personal_token, methods=["POST"]),
+        Route("/tokens/revoke", endpoint=revoke_personal_token, methods=["POST"]),
         Route("/spotify/connect", endpoint=spotify_connect, methods=["GET"]),
         Route("/auth/spotify/callback", endpoint=spotify_callback, methods=["GET"]),
         Route("/oauth/approval", endpoint=oauth_approval, methods=["GET", "POST"]),
         Route("/healthz", endpoint=healthz, methods=["GET"]),
     ]
+
+
+def _dashboard_page(
+    session: SessionRecord,
+    *,
+    services: ServiceContainer,
+    settings: WaiMusicSettings,
+    created_token: str | None = None,
+    token_error: str | None = None,
+) -> str:
+    spotify = services.auth_store.get_spotify_connection(session.user_id)
+    recent_playlists = services.cache.list_playlists(user_id=session.user_id)[-5:]
+    personal_tokens = services.auth_store.list_personal_access_tokens(session.user_id)
+    spotify_markup = (
+        f"""
+        <p>Connected as <strong>{escape(spotify.spotify_user_id)}</strong>.</p>
+        <p class="muted">Last updated: {escape(spotify.updated_at)}</p>
+        <div class="actions">
+          <a class="button" href="/spotify/connect">Reconnect Spotify</a>
+        </div>
+        """
+        if spotify is not None
+        else """
+        <p>Spotify is not connected yet.</p>
+        <div class="actions">
+          <a class="button" href="/spotify/connect">Connect Spotify</a>
+        </div>
+        """
+    )
+    playlists_markup = (
+        "<ul>"
+        + "".join(
+            f"<li><strong>{escape(item['slug'])}</strong> "
+            f'<span class="muted">{escape(item["playlist_id"])}</span></li>'
+            for item in recent_playlists
+        )
+        + "</ul>"
+        if recent_playlists
+        else '<p class="muted">No playlist history recorded yet.</p>'
+    )
+    tokens_markup = (
+        "<ul>"
+        + "".join(
+            f"<li><strong>{escape(token.label)}</strong> "
+            f'<span class="muted">••••{escape(token.last4)} · expires {escape(_format_unix_ts(token.expires_at))}</span> '
+            f'<form method="post" action="/tokens/revoke" style="display:inline">'
+            f'<input type="hidden" name="token_fingerprint" value="{escape(token.token_fingerprint)}" />'
+            f'<button class="secondary" type="submit">Revoke</button>'
+            f"</form></li>"
+            for token in personal_tokens
+        )
+        + "</ul>"
+        if personal_tokens
+        else '<p class="muted">No personal access tokens issued yet.</p>'
+    )
+    created_token_markup = (
+        f"""
+        <div class="error" style="background:#eef8f2;color:#1b5d3f;border-color:rgba(27,93,63,0.18);">
+          Copy this token now. It will not be shown again.
+          <p class="mono">{escape(created_token)}</p>
+        </div>
+        """
+        if created_token is not None
+        else ""
+    )
+    token_error_markup = (
+        f'<div class="error">{escape(token_error)}</div>' if token_error is not None else ""
+    )
+    mcp_url = _mcp_url(settings)
+    return _page(
+        "Dashboard",
+        f"""
+        <section class="hero">
+          <p class="eyebrow">Dashboard</p>
+          <h1>{escape(session.email)}</h1>
+          <p>
+            This account owns a separate Spotify integration and receives user-scoped MCP access
+            through OAuth. The MCP endpoint below is the URL you add in Claude.
+          </p>
+          <div class="actions">
+            <a class="button secondary" href="/spotify/connect">Spotify settings</a>
+            <form method="post" action="/logout"><button class="secondary" type="submit">Sign out</button></form>
+          </div>
+        </section>
+        <section class="grid">
+          <article class="card">
+            <h2>Spotify</h2>
+            {spotify_markup}
+          </article>
+          <article class="card">
+            <h2>MCP Endpoint</h2>
+            <p class="mono">{escape(mcp_url)}</p>
+            <p class="muted">
+              Claude will discover OAuth metadata automatically from this service.
+            </p>
+          </article>
+          <article class="card">
+            <h2>Connect Claude</h2>
+            <ol>
+              <li>Add a custom connector in Claude with the MCP endpoint above.</li>
+              <li>Leave advanced OAuth client settings empty.</li>
+              <li>No API key or manual token is required for the normal flow.</li>
+              <li>Claude will redirect you back here for sign-in and approval.</li>
+            </ol>
+          </article>
+          <article class="card">
+            <h2>Advanced Clients</h2>
+            <p class="muted">
+              Use personal access tokens for manual testing or clients that do not support OAuth.
+              For Claude, prefer the OAuth flow above.
+            </p>
+            {token_error_markup}
+            {created_token_markup}
+            <form method="post" action="/tokens/create">
+              <label>
+                Token label
+                <input name="label" placeholder="Inspector, local script, curl" />
+              </label>
+              <button type="submit">Generate token</button>
+            </form>
+            <div style="margin-top: 16px;">
+              {tokens_markup}
+            </div>
+          </article>
+          <article class="card">
+            <h2>Recent Playlists</h2>
+            {playlists_markup}
+          </article>
+        </section>
+        """,
+    )
+
+
+def _format_unix_ts(value: int) -> str:
+    return datetime.fromtimestamp(value, UTC).isoformat(timespec="seconds")
 
 
 def _safe_next(request: Request, candidate: str | None = None) -> str:

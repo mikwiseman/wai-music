@@ -45,6 +45,26 @@ def test_hosted_web_dashboard_and_healthz(tmp_path: Path) -> None:
         assert "user@example.com" in dashboard.text
         assert "http://localhost:8765/mcp" in dashboard.text
         assert "No API key or manual token is required" in dashboard.text
+        assert "Generate token" in dashboard.text
+
+
+def test_personal_access_token_can_be_created_from_dashboard(tmp_path: Path) -> None:
+    settings = _hosted_settings(tmp_path)
+    services = create_services(settings)
+    app = build_web_app(services, settings=settings)
+
+    with TestClient(app) as client:
+        sign_up = client.post(
+            "/sign-up",
+            data={"email": "user@example.com", "password": "correct horse battery staple"},
+            follow_redirects=False,
+        )
+        assert sign_up.status_code == 303
+
+        created = client.post("/tokens/create", data={"label": "curl"})
+        assert created.status_code == 200
+        assert "Copy this token now" in created.text
+        assert "curl" in created.text
 
 
 def test_oauth_approval_page_round_trip(tmp_path: Path) -> None:

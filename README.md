@@ -181,6 +181,8 @@ That means:
 
 The hosted server stores Spotify tokens and MCP OAuth tokens separately. Spotify tokens stay on `wai-music` and are encrypted at rest.
 
+For advanced manual testing, the dashboard can also mint revocable personal access tokens. Those are intended for MCP Inspector, `curl`, or clients without OAuth support. For `claude.ai`, prefer the built-in OAuth flow.
+
 ## Example Prompts
 
 - "Find the artist Rachmaninoff and tell me the story behind Piano Concerto No. 2."
