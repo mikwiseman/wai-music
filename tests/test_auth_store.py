@@ -16,10 +16,13 @@ def test_auth_store_round_trip(tmp_path: Path) -> None:
     session_token = store.create_session(user_id=user.user_id, ttl_seconds=3600)
     session = store.get_session(session_token)
 
-    assert store.authenticate_user(
-        email="alice@example.com",
-        password="correct horse battery staple",
-    ) == user
+    assert (
+        store.authenticate_user(
+            email="alice@example.com",
+            password="correct horse battery staple",
+        )
+        == user
+    )
     assert session is not None
     assert session.user_id == user.user_id
 

@@ -129,7 +129,9 @@ class WaiOAuthProvider(
             token=refresh_token,
             client_id=client_id,
             scopes=list(payload.get("scopes", [])),
-            expires_at=int(payload["expires_at"]) if payload.get("expires_at") is not None else None,
+            expires_at=int(payload["expires_at"])
+            if payload.get("expires_at") is not None
+            else None,
             user_id=str(payload["user_id"]),
         )
 
@@ -156,7 +158,9 @@ class WaiOAuthProvider(
             token=token,
             client_id=str(payload["client_id"]),
             scopes=list(payload.get("scopes", [])),
-            expires_at=int(payload["expires_at"]) if payload.get("expires_at") is not None else None,
+            expires_at=int(payload["expires_at"])
+            if payload.get("expires_at") is not None
+            else None,
             resource=payload.get("resource"),
             user_id=str(payload["user_id"]),
         )

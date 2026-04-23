@@ -59,7 +59,12 @@ async def main() -> int:
                 },
             )
 
-            if not artist_results or not release_results or not recording_results or not work_results:
+            if (
+                not artist_results
+                or not release_results
+                or not recording_results
+                or not work_results
+            ):
                 raise RuntimeError("search tools did not return the required entity seeds")
 
             artist = artist_results[0]
@@ -123,7 +128,9 @@ async def main() -> int:
                 "resolve": await call_tool(server, "resolve", {"identifier": artist["mbid"]}),
                 "get_artist": await call_tool(server, "get_artist", {"mbid": artist["mbid"]}),
                 "get_release": await call_tool(server, "get_release", {"mbid": release["mbid"]}),
-                "get_recording": await call_tool(server, "get_recording", {"mbid": recording["mbid"]}),
+                "get_recording": await call_tool(
+                    server, "get_recording", {"mbid": recording["mbid"]}
+                ),
                 "get_work": await call_tool(server, "get_work", {"mbid": work["mbid"]}),
                 "get_related": await call_tool(server, "get_related", {"mbid": artist["mbid"]}),
                 "get_artist_story": await call_tool(

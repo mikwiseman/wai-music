@@ -30,7 +30,11 @@ def build_server(
     port: int | None = None,
 ) -> FastMCP:
     configured_candidate = settings if settings is not None else getattr(services, "settings", None)
-    configured = configured_candidate if isinstance(configured_candidate, WaiMusicSettings) else WaiMusicSettings()
+    configured = (
+        configured_candidate
+        if isinstance(configured_candidate, WaiMusicSettings)
+        else WaiMusicSettings()
+    )
     if host is not None:
         configured.host = host
     if port is not None:
@@ -87,7 +91,11 @@ def build_web_app(
 ) -> Starlette:
     configured = settings or services.settings
     mcp = build_server(services, settings=configured)
-    oauth_provider = WaiOAuthProvider(store=services.auth_store, settings=configured) if configured.oauth_enabled else None
+    oauth_provider = (
+        WaiOAuthProvider(store=services.auth_store, settings=configured)
+        if configured.oauth_enabled
+        else None
+    )
     mcp_app = mcp.streamable_http_app()
 
     @asynccontextmanager

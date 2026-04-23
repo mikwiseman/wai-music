@@ -47,7 +47,9 @@ class WaiMusicSettings(BaseSettings):
     public_base_url: str | None = Field(default=None, alias="WAI_MUSIC_PUBLIC_BASE_URL")
     secret_key: str | None = Field(default=None, alias="WAI_MUSIC_SECRET_KEY")
     session_cookie_name: str = Field(default="wai_music_session", alias="WAI_MUSIC_SESSION_COOKIE")
-    session_ttl_seconds: int = Field(default=60 * 60 * 24 * 30, alias="WAI_MUSIC_SESSION_TTL_SECONDS")
+    session_ttl_seconds: int = Field(
+        default=60 * 60 * 24 * 30, alias="WAI_MUSIC_SESSION_TTL_SECONDS"
+    )
     oauth_access_token_ttl_seconds: int = Field(
         default=60 * 60,
         alias="WAI_MUSIC_OAUTH_ACCESS_TOKEN_TTL_SECONDS",

@@ -28,7 +28,9 @@ CLASSICAL_TOKENS = ("concerto", "symphony", "sonata", "suite", "adagio", "opus",
 class SpotifyBackend:
     name = "spotify"
 
-    def __init__(self, settings: WaiMusicSettings, *, auth_store: SQLiteAuthStore | None = None) -> None:
+    def __init__(
+        self, settings: WaiMusicSettings, *, auth_store: SQLiteAuthStore | None = None
+    ) -> None:
         self._settings = settings
         self._auth_store = auth_store
         self._legacy_client: spotipy.Spotify | None = None
@@ -112,7 +114,9 @@ class SpotifyBackend:
         method = getattr(client, method_name)
         return await asyncio.to_thread(method, *args, **kwargs)
 
-    async def _call_for_user(self, user_id: str, method_name: str, *args: Any, **kwargs: Any) -> Any:
+    async def _call_for_user(
+        self, user_id: str, method_name: str, *args: Any, **kwargs: Any
+    ) -> Any:
         if self._auth_store is None:
             raise RuntimeError("Hosted Spotify auth store is not configured")
         connection = self._auth_store.get_spotify_connection(user_id)
@@ -122,7 +126,9 @@ class SpotifyBackend:
         access_token = token_payload.get("access_token")
         if not isinstance(access_token, str):
             raise RuntimeError("Spotify access token is missing for this user")
-        client = spotipy.Spotify(auth=access_token, requests_timeout=self._settings.http_timeout_seconds)
+        client = spotipy.Spotify(
+            auth=access_token, requests_timeout=self._settings.http_timeout_seconds
+        )
         try:
             method = getattr(client, method_name)
             return await asyncio.to_thread(method, *args, **kwargs)

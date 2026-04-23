@@ -151,7 +151,9 @@ def build_web_routes(
 
     async def sign_up(request: Request) -> Response:
         if request.method == "GET":
-            return HTMLResponse(_auth_form("Create account", "/sign-up", next_path=_safe_next(request)))
+            return HTMLResponse(
+                _auth_form("Create account", "/sign-up", next_path=_safe_next(request))
+            )
         form = await _parse_form(request)
         next_path = _safe_next(request, form.get("next"))
         try:
@@ -238,12 +240,12 @@ def build_web_routes(
             "<ul>"
             + "".join(
                 f"<li><strong>{escape(item['slug'])}</strong> "
-                f"<span class=\"muted\">{escape(item['playlist_id'])}</span></li>"
+                f'<span class="muted">{escape(item["playlist_id"])}</span></li>'
                 for item in recent_playlists
             )
             + "</ul>"
             if recent_playlists
-            else "<p class=\"muted\">No playlist history recorded yet.</p>"
+            else '<p class="muted">No playlist history recorded yet.</p>'
         )
         mcp_url = _mcp_url(settings)
         body = f"""
