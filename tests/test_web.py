@@ -44,6 +44,7 @@ def test_hosted_web_dashboard_and_healthz(tmp_path: Path) -> None:
         assert dashboard.status_code == 200
         assert "user@example.com" in dashboard.text
         assert "http://localhost:8765/mcp" in dashboard.text
+        assert "No API key or manual token is required" in dashboard.text
 
 
 def test_oauth_approval_page_round_trip(tmp_path: Path) -> None:

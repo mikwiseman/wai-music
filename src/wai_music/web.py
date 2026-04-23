@@ -121,6 +121,11 @@ ul {
   padding-left: 18px;
   color: #44372b;
 }
+ol {
+  margin: 0;
+  padding-left: 20px;
+  color: #44372b;
+}
 """
 
 
@@ -272,6 +277,15 @@ def build_web_routes(
             <p class="muted">
               Claude will discover OAuth metadata automatically from this service.
             </p>
+          </article>
+          <article class="card">
+            <h2>Connect Claude</h2>
+            <ol>
+              <li>Add a custom connector in Claude with the MCP endpoint above.</li>
+              <li>Leave advanced OAuth client settings empty.</li>
+              <li>No API key or manual token is required for the normal flow.</li>
+              <li>Claude will redirect you back here for sign-in and approval.</li>
+            </ol>
           </article>
           <article class="card">
             <h2>Recent Playlists</h2>

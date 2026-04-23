@@ -157,6 +157,30 @@ Then point the client to `http://127.0.0.1:8765/mcp`.
 
 For production deployment under `music.waiwai.is`, see [docs/deploy/ubuntu-24.04.md](docs/deploy/ubuntu-24.04.md).
 
+For the hosted end-user and Claude connector flow, see [docs/hosted-users.md](docs/hosted-users.md).
+
+## Claude.ai Connector Flow
+
+For the normal `claude.ai` flow, users do not need a manually generated API key.
+
+Recommended flow:
+
+1. The user creates a `wai-music` account and signs in on the hosted web UI.
+2. The user connects Spotify in the dashboard.
+3. In Claude, the user adds a custom connector pointing to `https://music.waiwai.is/mcp`.
+4. Leave Claude's advanced OAuth client settings empty unless you intentionally manage client credentials yourself.
+5. Claude discovers the server's OAuth metadata, starts OAuth, and redirects the user back to `wai-music`.
+6. The user approves access on `wai-music`, and the server issues user-scoped OAuth tokens to Claude.
+
+That means:
+
+- no shared global API key
+- no manual token copy-paste for end users
+- each Claude connection is tied to one `wai-music` user
+- each `wai-music` user is tied to their own Spotify connection
+
+The hosted server stores Spotify tokens and MCP OAuth tokens separately. Spotify tokens stay on `wai-music` and are encrypted at rest.
+
 ## Example Prompts
 
 - "Find the artist Rachmaninoff and tell me the story behind Piano Concerto No. 2."
