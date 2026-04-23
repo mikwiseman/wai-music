@@ -87,6 +87,7 @@ WAI_MUSIC_HOST=127.0.0.1
 WAI_MUSIC_PORT=8765
 WAI_MUSIC_PUBLIC_BASE_URL=
 WAI_MUSIC_SECRET_KEY=
+WAI_MUSIC_ENABLE_PERSONAL_ACCESS_TOKENS=false
 
 MUSICBRAINZ_USER_AGENT=wai-music/0.1 (+https://github.com/mikwiseman/wai-music)
 ```
@@ -181,7 +182,7 @@ That means:
 
 The hosted server stores Spotify tokens and MCP OAuth tokens separately. Spotify tokens stay on `wai-music` and are encrypted at rest.
 
-For advanced manual testing, the dashboard can also mint revocable personal access tokens. Those are intended for MCP Inspector, `curl`, or clients without OAuth support. For `claude.ai`, prefer the built-in OAuth flow.
+For advanced manual testing, the dashboard can also mint revocable personal access tokens when `WAI_MUSIC_ENABLE_PERSONAL_ACCESS_TOKENS=true`. Those are intended for MCP Inspector, `curl`, or clients without OAuth support. For `claude.ai`, prefer the built-in OAuth flow.
 
 ## Example Prompts
 

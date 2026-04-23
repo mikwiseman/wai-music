@@ -63,7 +63,7 @@ The server already supports OAuth-based remote MCP auth, which is the correct mo
 
 ## Personal access tokens
 
-The dashboard also exposes personal access tokens for advanced use cases:
+The dashboard can expose personal access tokens for advanced use cases when the server enables them:
 
 - manual MCP testing with `curl`
 - MCP Inspector
@@ -112,11 +112,11 @@ The current flow is suitable for a controlled rollout or early beta:
 
 Before broad public launch, the next hardening steps should be:
 
-1. Add rate limiting for sign-up, sign-in, and OAuth endpoints
-2. Add email verification
-3. Add password reset
-4. Add optional invite-only mode or admin approval
-5. Add monitoring and audit logging for auth and tool usage
+1. Add email verification
+2. Add password reset
+3. Add optional invite-only mode or admin approval
+4. Add monitoring and audit logging for auth and tool usage
+5. Decide whether personal access tokens should stay disabled for the public server
 
 ## Summary
 

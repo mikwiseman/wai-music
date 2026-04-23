@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import time
+from collections import defaultdict, deque
 from datetime import UTC, datetime
 from html import escape
+from threading import Lock
 from urllib.parse import parse_qs, quote
 
 from mcp.server.auth.provider import construct_redirect_uri
@@ -135,6 +138,8 @@ def build_web_routes(
     settings: WaiMusicSettings,
     oauth_provider: WaiOAuthProvider | None,
 ) -> list[BaseRoute]:
+    rate_limiter = InMemoryRateLimiter()
+
     async def landing(request: Request) -> Response:
         session = _session_from_request(request, services=services, settings=settings)
         if session is not None:
@@ -160,6 +165,15 @@ def build_web_routes(
             return HTMLResponse(
                 _auth_form("Create account", "/sign-up", next_path=_safe_next(request))
             )
+        sign_up_limited = _rate_limit_response(
+            request=request,
+            limiter=rate_limiter,
+            bucket=f"signup:{_request_identity(request)}",
+            window_seconds=settings.signup_rate_limit_window_seconds,
+            max_attempts=settings.signup_rate_limit_max_attempts,
+        )
+        if sign_up_limited is not None:
+            return sign_up_limited
         form = await _parse_form(request)
         next_path = _safe_next(request, form.get("next"))
         try:
@@ -188,6 +202,15 @@ def build_web_routes(
     async def sign_in(request: Request) -> Response:
         if request.method == "GET":
             return HTMLResponse(_auth_form("Sign in", "/sign-in", next_path=_safe_next(request)))
+        sign_in_limited = _rate_limit_response(
+            request=request,
+            limiter=rate_limiter,
+            bucket=f"signin:{_request_identity(request)}",
+            window_seconds=settings.signin_rate_limit_window_seconds,
+            max_attempts=settings.signin_rate_limit_max_attempts,
+        )
+        if sign_in_limited is not None:
+            return sign_in_limited
         form = await _parse_form(request)
         next_path = _safe_next(request, form.get("next"))
         user = services.auth_store.authenticate_user(
@@ -233,9 +256,20 @@ def build_web_routes(
         )
 
     async def create_personal_token(request: Request) -> Response:
+        if not settings.enable_personal_access_tokens:
+            return Response(status_code=404)
         session = _require_session(request, services=services, settings=settings)
         if isinstance(session, Response):
             return session
+        token_limited = _rate_limit_response(
+            request=request,
+            limiter=rate_limiter,
+            bucket=f"personal-token:{session.user_id}",
+            window_seconds=settings.personal_access_token_rate_limit_window_seconds,
+            max_attempts=settings.personal_access_token_rate_limit_max_attempts,
+        )
+        if token_limited is not None:
+            return token_limited
         form = await _parse_form(request)
         try:
             _record, raw_token = services.auth_store.create_personal_access_token(
@@ -265,6 +299,8 @@ def build_web_routes(
         )
 
     async def revoke_personal_token(request: Request) -> Response:
+        if not settings.enable_personal_access_tokens:
+            return Response(status_code=404)
         session = _require_session(request, services=services, settings=settings)
         if isinstance(session, Response):
             return session
@@ -524,6 +560,31 @@ def _dashboard_page(
         f'<div class="error">{escape(token_error)}</div>' if token_error is not None else ""
     )
     mcp_url = _mcp_url(settings)
+    token_card_markup = (
+        f"""
+          <article class="card">
+            <h2>Advanced Clients</h2>
+            <p class="muted">
+              Use personal access tokens for manual testing or clients that do not support OAuth.
+              For Claude, prefer the OAuth flow above.
+            </p>
+            {token_error_markup}
+            {created_token_markup}
+            <form method="post" action="/tokens/create">
+              <label>
+                Token label
+                <input name="label" placeholder="Inspector, local script, curl" />
+              </label>
+              <button type="submit">Generate token</button>
+            </form>
+            <div style="margin-top: 16px;">
+              {tokens_markup}
+            </div>
+          </article>
+        """
+        if settings.enable_personal_access_tokens
+        else ""
+    )
     return _page(
         "Dashboard",
         f"""
@@ -560,25 +621,7 @@ def _dashboard_page(
               <li>Claude will redirect you back here for sign-in and approval.</li>
             </ol>
           </article>
-          <article class="card">
-            <h2>Advanced Clients</h2>
-            <p class="muted">
-              Use personal access tokens for manual testing or clients that do not support OAuth.
-              For Claude, prefer the OAuth flow above.
-            </p>
-            {token_error_markup}
-            {created_token_markup}
-            <form method="post" action="/tokens/create">
-              <label>
-                Token label
-                <input name="label" placeholder="Inspector, local script, curl" />
-              </label>
-              <button type="submit">Generate token</button>
-            </form>
-            <div style="margin-top: 16px;">
-              {tokens_markup}
-            </div>
-          </article>
+          {token_card_markup}
           <article class="card">
             <h2>Recent Playlists</h2>
             {playlists_markup}
@@ -590,6 +633,65 @@ def _dashboard_page(
 
 def _format_unix_ts(value: int) -> str:
     return datetime.fromtimestamp(value, UTC).isoformat(timespec="seconds")
+
+
+class InMemoryRateLimiter:
+    def __init__(self) -> None:
+        self._events: dict[str, deque[float]] = defaultdict(deque)
+        self._lock = Lock()
+
+    def hit(self, *, bucket: str, window_seconds: int, max_attempts: int) -> int | None:
+        now = time.time()
+        with self._lock:
+            queue = self._events[bucket]
+            while queue and queue[0] <= now - window_seconds:
+                queue.popleft()
+            if len(queue) >= max_attempts:
+                retry_after = max(1, int(window_seconds - (now - queue[0])))
+                return retry_after
+            queue.append(now)
+        return None
+
+
+def _request_identity(request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        return forwarded_for.split(",", maxsplit=1)[0].strip()
+    if request.client is not None and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+def _rate_limit_response(
+    *,
+    request: Request,
+    limiter: InMemoryRateLimiter,
+    bucket: str,
+    window_seconds: int,
+    max_attempts: int,
+) -> Response | None:
+    retry_after = limiter.hit(
+        bucket=bucket,
+        window_seconds=window_seconds,
+        max_attempts=max_attempts,
+    )
+    if retry_after is None:
+        return None
+    body = _page(
+        "Too many requests",
+        """
+        <section class="hero">
+          <div class="error">
+            Too many attempts from this client. Please wait and try again.
+          </div>
+        </section>
+        """,
+    )
+    return HTMLResponse(
+        body,
+        status_code=429,
+        headers={"Retry-After": str(retry_after)},
+    )
 
 
 def _safe_next(request: Request, candidate: str | None = None) -> str:

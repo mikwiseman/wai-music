@@ -66,9 +66,37 @@ class WaiMusicSettings(BaseSettings):
         default=60 * 5,
         alias="WAI_MUSIC_OAUTH_AUTHORIZATION_CODE_TTL_SECONDS",
     )
+    enable_personal_access_tokens: bool = Field(
+        default=False,
+        alias="WAI_MUSIC_ENABLE_PERSONAL_ACCESS_TOKENS",
+    )
     personal_access_token_ttl_seconds: int = Field(
         default=60 * 60 * 24 * 30,
         alias="WAI_MUSIC_PERSONAL_ACCESS_TOKEN_TTL_SECONDS",
+    )
+    signup_rate_limit_window_seconds: int = Field(
+        default=60 * 15,
+        alias="WAI_MUSIC_SIGNUP_RATE_LIMIT_WINDOW_SECONDS",
+    )
+    signup_rate_limit_max_attempts: int = Field(
+        default=5,
+        alias="WAI_MUSIC_SIGNUP_RATE_LIMIT_MAX_ATTEMPTS",
+    )
+    signin_rate_limit_window_seconds: int = Field(
+        default=60 * 15,
+        alias="WAI_MUSIC_SIGNIN_RATE_LIMIT_WINDOW_SECONDS",
+    )
+    signin_rate_limit_max_attempts: int = Field(
+        default=10,
+        alias="WAI_MUSIC_SIGNIN_RATE_LIMIT_MAX_ATTEMPTS",
+    )
+    personal_access_token_rate_limit_window_seconds: int = Field(
+        default=60 * 60,
+        alias="WAI_MUSIC_PERSONAL_ACCESS_TOKEN_RATE_LIMIT_WINDOW_SECONDS",
+    )
+    personal_access_token_rate_limit_max_attempts: int = Field(
+        default=5,
+        alias="WAI_MUSIC_PERSONAL_ACCESS_TOKEN_RATE_LIMIT_MAX_ATTEMPTS",
     )
     spotify_oauth_state_ttl_seconds: int = Field(
         default=60 * 10,
