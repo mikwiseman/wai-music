@@ -18,7 +18,6 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
   "Typing :: Typed",
 ]
 dependencies = [
@@ -45,11 +44,6 @@ wai-music = "wai_music.server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/wai_music"]
-
-[tool.hatch.build]
-include = [
-  "src/wai_music/data/*.json",
-]
 
 [tool.pytest.ini_options]
 addopts = "-ra"

@@ -1,3 +1,5 @@
+import pytest
+
 from wai_music.models import DailyPick, Entity, EntityType, Fact, PlaylistRef, SavedNotes, Story
 
 
@@ -12,6 +14,17 @@ def test_story_requires_facts_or_extract() -> None:
     entity = Entity(type=EntityType.ARTIST, name="Sergei Rachmaninoff")
     story = Story(entity_ref=entity, facts=[Fact(kind="event", label="Born")], language="en")
     assert story.facts[0].label == "Born"
+
+
+def test_full_story_requires_wikipedia_extract() -> None:
+    entity = Entity(type=EntityType.ARTIST, name="Sergei Rachmaninoff")
+    with pytest.raises(ValueError, match="full story requires wikipedia_extract"):
+        Story(
+            entity_ref=entity,
+            facts=[Fact(kind="event", label="Born")],
+            language="en",
+            context_depth="full",
+        )
 
 
 def test_daily_pick_and_saved_notes_serialize() -> None:

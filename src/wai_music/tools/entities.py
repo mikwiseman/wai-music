@@ -13,14 +13,18 @@ async def get_entity(
     *,
     entity_type: EntityType,
     services: ServiceContainer,
-    language: str = "en",
+    language: str | None = None,
 ) -> Entity:
-    return await services.aggregator.aggregate_entity(mbid, entity_type, language=language)
+    return await services.aggregator.aggregate_entity(
+        mbid,
+        entity_type,
+        language=language or services.settings.default_language,
+    )
 
 
 def register(mcp: FastMCP, services: ServiceContainer) -> None:
     @mcp.tool()
-    async def get_artist(mbid: str, language: str = "en") -> Entity:
+    async def get_artist(mbid: str, language: str | None = None) -> Entity:
         """Get a canonical artist profile from MusicBrainz and Wikipedia."""
 
         return await get_entity(
@@ -28,7 +32,7 @@ def register(mcp: FastMCP, services: ServiceContainer) -> None:
         )
 
     @mcp.tool()
-    async def get_release(mbid: str, language: str = "en") -> Entity:
+    async def get_release(mbid: str, language: str | None = None) -> Entity:
         """Get a canonical release profile, including tracklist where available."""
 
         return await get_entity(
@@ -36,7 +40,7 @@ def register(mcp: FastMCP, services: ServiceContainer) -> None:
         )
 
     @mcp.tool()
-    async def get_recording(mbid: str, language: str = "en") -> Entity:
+    async def get_recording(mbid: str, language: str | None = None) -> Entity:
         """Get a canonical recording profile and release context."""
 
         return await get_entity(
@@ -44,7 +48,7 @@ def register(mcp: FastMCP, services: ServiceContainer) -> None:
         )
 
     @mcp.tool()
-    async def get_work(mbid: str, language: str = "en") -> Entity:
+    async def get_work(mbid: str, language: str | None = None) -> Entity:
         """Get a canonical work profile and known performance recordings."""
 
         return await get_entity(

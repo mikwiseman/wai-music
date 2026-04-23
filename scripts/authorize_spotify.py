@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import secrets
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from queue import Queue
+from queue import Empty, Queue
 from urllib.parse import parse_qs, urlparse
 
 from spotipy.oauth2 import SpotifyOAuth
@@ -27,7 +28,8 @@ def main() -> int:
         cache_path=str(settings.spotify_cache_path),
         open_browser=False,
     )
-    authorize_url = auth_manager.get_authorize_url()
+    expected_state = secrets.token_urlsafe(32)
+    authorize_url = auth_manager.get_authorize_url(state=expected_state)
     redirect = urlparse(settings.spotify_redirect_uri)
     if not redirect.hostname or not redirect.port:
         raise RuntimeError("SPOTIFY_REDIRECT_URI must include host and port")
@@ -39,6 +41,10 @@ def main() -> int:
             parsed = urlparse(self.path)
             if parsed.path != redirect.path:
                 self.send_error(404)
+                return
+            state = parse_qs(parsed.query).get("state", [None])[0]
+            if state != expected_state:
+                self.send_error(400, "Invalid OAuth state")
                 return
             code = parse_qs(parsed.query).get("code", [None])[0]
             if code is None:
@@ -54,13 +60,20 @@ def main() -> int:
             return
 
     server = HTTPServer((redirect.hostname, redirect.port), CallbackHandler)
-    thread = threading.Thread(target=server.handle_request, daemon=True)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     webbrowser.open(authorize_url)
     print(f"Open this URL if the browser did not launch:\n{authorize_url}\n")
-    code = queue.get()
+    try:
+        code = queue.get(timeout=300)
+    except Empty as exc:
+        raise TimeoutError("Timed out waiting for Spotify OAuth callback") from exc
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=1)
+
     token_info = auth_manager.get_access_token(code=code, as_dict=True, check_cache=False)
-    server.server_close()
 
     if not token_info.get("refresh_token"):
         raise RuntimeError("Spotify did not return a refresh token")

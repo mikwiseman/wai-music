@@ -57,14 +57,14 @@ class SQLiteCache:
                 "SELECT payload_json, ttl, fetched_at FROM api_cache WHERE url = ?",
                 (url,),
             ).fetchone()
-        if row is None:
-            return None
-        fetched_at = datetime.fromisoformat(str(row["fetched_at"]))
-        expires_at = fetched_at + timedelta(seconds=int(row["ttl"]))
-        if expires_at <= datetime.now(UTC):
-            self.delete(url)
-            return None
-        return json.loads(str(row["payload_json"]))
+            if row is None:
+                return None
+            fetched_at = datetime.fromisoformat(str(row["fetched_at"]))
+            expires_at = fetched_at + timedelta(seconds=int(row["ttl"]))
+            if expires_at <= datetime.now(UTC):
+                connection.execute("DELETE FROM api_cache WHERE url = ?", (url,))
+                return None
+            return json.loads(str(row["payload_json"]))
 
     def set_json(self, url: str, payload: Any, ttl_seconds: int) -> None:
         now = datetime.now(UTC).isoformat()

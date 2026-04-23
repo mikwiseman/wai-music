@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
-from wai_music.models import EntityType, RelationRef
+from wai_music.models import RelationRef
 from wai_music.services import ServiceContainer
 
 
@@ -14,7 +14,11 @@ async def get_related_entities(
     services: ServiceContainer,
     kind: str | None = None,
 ) -> list[RelationRef]:
-    return await services.aggregator.get_related(mbid, EntityType.ARTIST, kind=kind)
+    entity_match = await services.musicbrainz.probe(mbid)
+    if entity_match is None:
+        raise ValueError(f"MusicBrainz entity not found for MBID {mbid}")
+    entity_type, _payload = entity_match
+    return await services.aggregator.get_related(mbid, entity_type, kind=kind)
 
 
 def register(mcp: FastMCP, services: ServiceContainer) -> None:

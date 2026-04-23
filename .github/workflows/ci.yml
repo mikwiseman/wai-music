@@ -21,4 +21,11 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy src/
       - run: uv run pytest tests/ -v --cov=src/wai_music --cov-report=term-missing
-
+      - run: uv build
+      - run: uv venv .venv-wheel --python ${{ matrix.python-version }}
+      - run: uv pip install --python .venv-wheel/bin/python dist/*.whl
+      - run: .venv-wheel/bin/python -c "from wai_music.server import main; from wai_music.models import Entity"
+      - run: .venv-wheel/bin/wai-music --help
+      - run: uv venv .venv-sdist --python ${{ matrix.python-version }}
+      - run: uv pip install --python .venv-sdist/bin/python dist/*.tar.gz
+      - run: .venv-sdist/bin/python -c "from wai_music.server import main; from wai_music.models import Entity"

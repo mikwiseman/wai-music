@@ -38,8 +38,20 @@ async def create_backend_playlist(
         description=description,
         public=public,
     )
-    added = await playback_backend.add_tracks(playlist_id=playlist.playlist_id, track_ids=track_ids)
-    services.cache.record_playlist(backend=backend, playlist_id=playlist.playlist_id, slug=name)
+    try:
+        added = await playback_backend.add_tracks(
+            playlist_id=playlist.playlist_id, track_ids=track_ids
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            f"playlist {playlist.playlist_id} was created remotely, but adding tracks failed"
+        ) from exc
+    try:
+        services.cache.record_playlist(backend=backend, playlist_id=playlist.playlist_id, slug=name)
+    except Exception as exc:
+        raise RuntimeError(
+            "playlist was created remotely, but local playlist history persistence failed"
+        ) from exc
     return PlaylistCreationResult(playlist=playlist, added_track_ids=added, public=public)
 
 

@@ -41,6 +41,18 @@ With `uv`:
 uv sync --extra dev
 ```
 
+Build distributable artifacts:
+
+```bash
+uv build
+```
+
+Install the built wheel into an isolated environment:
+
+```bash
+uv tool install dist/wai_music-0.1.0-py3-none-any.whl
+```
+
 Run the local MCP server in stdio mode:
 
 ```bash
@@ -80,7 +92,7 @@ Spotify scopes used by the project:
 
 ## Spotify OAuth
 
-Run the local authorization helper:
+From a source checkout, run the local authorization helper:
 
 ```bash
 uv run python scripts/authorize_spotify.py

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from typing import Literal
@@ -46,12 +47,6 @@ def build_server(
     daily.register(mcp, services)
     artifacts.register(mcp, services)
 
-    @mcp.tool()
-    async def health_check() -> str:
-        """Return a simple health string."""
-
-        return "ok"
-
     return mcp
 
 
@@ -72,4 +67,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         mcp.run(transport=transport)
     except KeyboardInterrupt:
         return 0
+    finally:
+        asyncio.run(services.close())
     return 0

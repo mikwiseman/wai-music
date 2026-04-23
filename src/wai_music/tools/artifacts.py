@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import re
 from datetime import datetime
+from json import dumps as json_dumps
 
 from mcp.server.fastmcp import FastMCP
 
@@ -24,7 +26,14 @@ def save_markdown_notes(
         raise ValueError("slug must match ^[a-z0-9]+(?:-[a-z0-9]+)*$")
     target_path = services.settings.playlists_dir / f"{datetime.now().date().isoformat()}-{slug}.md"
     payload = _front_matter(slug, entities or [])
-    target_path.write_text(f"{payload}\n{markdown.strip()}\n", encoding="utf-8")
+    contents = f"{payload}\n{markdown.strip()}\n"
+    try:
+        with target_path.open("x", encoding="utf-8") as handle:
+            handle.write(contents)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except FileExistsError as exc:
+        raise FileExistsError(f"notes already exist for slug {slug!r} on this date") from exc
     return SavedNotes(path=str(target_path), slug=slug, entities=entities or [])
 
 
@@ -34,7 +43,7 @@ def _front_matter(slug: str, entities: list[Entity]) -> str:
         lines.append("  []")
     for entity in entities:
         lines.append(f"  - type: {entity.type.value}")
-        lines.append(f'    name: "{entity.name}"')
+        lines.append(f"    name: {json_dumps(entity.name, ensure_ascii=False)}")
         if entity.mbid:
             lines.append(f"    mbid: {entity.mbid}")
     lines.append("---")

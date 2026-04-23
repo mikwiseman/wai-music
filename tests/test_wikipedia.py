@@ -5,6 +5,7 @@ import pytest
 
 from wai_music.cache import SQLiteCache
 from wai_music.http import JsonHttpClient
+from wai_music.models import EntityType
 from wai_music.sources.wikipedia import WikipediaSource
 
 
@@ -50,6 +51,68 @@ async def test_wikipedia_summary_and_facts_mock(settings, tmp_db_path) -> None:
     assert summary is not None
     assert summary["extract"] == "Jazz trumpeter and composer."
     assert facts["label"] == "Miles Davis"
+    assert facts["wikipedia_title"] == "Miles_Davis"
+
+
+@pytest.mark.asyncio
+async def test_wikipedia_summary_rejects_invalid_language(settings, tmp_db_path) -> None:
+    source = WikipediaSource(settings=settings, cache=SQLiteCache(tmp_db_path))
+    try:
+        with pytest.raises(ValueError, match="unsupported language"):
+            await source.get_summary("Miles_Davis", language="de")
+    finally:
+        await source.close()
+
+
+@pytest.mark.asyncio
+async def test_wikipedia_summary_returns_none_for_404(settings, tmp_db_path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            404, json={"type": "https://mediawiki.org/wiki/HyperSwitch/errors/not_found"}
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        source = WikipediaSource(
+            settings=settings,
+            cache=SQLiteCache(tmp_db_path),
+            client=JsonHttpClient(client=client),
+        )
+        summary = await source.get_summary("Missing_Page", language="en")
+
+    assert summary is None
+
+
+@pytest.mark.asyncio
+async def test_wikipedia_musicbrainz_fallback_lookup(settings, tmp_db_path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "results": {
+                    "bindings": [
+                        {
+                            "item": {"value": "http://www.wikidata.org/entity/Q1150"},
+                            "itemLabel": {"value": "Miles Davis"},
+                            "article": {"value": "https://en.wikipedia.org/wiki/Miles_Davis"},
+                        }
+                    ]
+                }
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        source = WikipediaSource(
+            settings=settings,
+            cache=SQLiteCache(tmp_db_path),
+            client=JsonHttpClient(client=client),
+        )
+        facts = await source.get_wikidata_facts_for_musicbrainz(
+            EntityType.ARTIST,
+            "561d854a-6a28-4aa7-8c99-323e6b71c6a3",
+            language="en",
+        )
+
+    assert facts["qid"] == "Q1150"
     assert facts["wikipedia_title"] == "Miles_Davis"
 
 

@@ -65,6 +65,27 @@ async def test_musicbrainz_search_and_resolve_url_mock(settings, tmp_db_path) ->
 
 
 @pytest.mark.asyncio
+async def test_musicbrainz_probe_propagates_non_not_found_errors(settings, tmp_db_path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/ws/2/artist/mbid-artist":
+            return httpx.Response(500, json={"error": "server failure"})
+        raise AssertionError(f"unexpected request: {request.method} {request.url}")
+
+    async with httpx.AsyncClient(
+        base_url="https://musicbrainz.org/ws/2",
+        transport=httpx.MockTransport(handler),
+        headers={"User-Agent": settings.musicbrainz_user_agent},
+    ) as client:
+        source = MusicBrainzSource(
+            settings=settings,
+            cache=SQLiteCache(tmp_db_path),
+            client=JsonHttpClient(client=client),
+        )
+        with pytest.raises(httpx.HTTPStatusError):
+            await source.probe("mbid-artist")
+
+
+@pytest.mark.asyncio
 @pytest.mark.vcr
 async def test_musicbrainz_live_search_rachmaninoff(settings, tmp_db_path) -> None:
     source = MusicBrainzSource(settings=settings, cache=SQLiteCache(tmp_db_path))

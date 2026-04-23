@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
+from wai_music.backends.base import SavedTracksPage
 from wai_music.models import Entity, EntityType, ExternalIds, ListeningProfile, TrackMatch
 from wai_music.services import ServiceContainer
 
@@ -42,6 +43,8 @@ async def build_profile(
     playback_backend = services.backends.get(backend)
     raw_top = await playback_backend.get_user_top(time_range=time_range)
     saved_tracks = await playback_backend.get_saved(limit=50)
+    if not isinstance(saved_tracks, SavedTracksPage):
+        raise TypeError("playback backend returned invalid saved tracks page")
     top_tracks = list(raw_top.get("tracks", []))
 
     normalized_top_tracks: list[TrackMatch] = []
@@ -86,7 +89,7 @@ async def build_profile(
     return ListeningProfile(
         top_artists=top_artists,
         top_tracks=normalized_top_tracks,
-        saved_count=len(saved_tracks),
+        saved_count=saved_tracks.total,
         inferred_eras=_infer_eras(normalized_top_tracks),
         inferred_genres=_infer_genres(artist_names),
     )

@@ -6,6 +6,7 @@ import re
 from typing import Any, Literal, cast
 
 from wai_music.data import load_scenes
+from wai_music.languages import validate_language
 from wai_music.models import Entity, EntityType, ExternalIds, Fact, ImageRef, RelationRef, Story
 from wai_music.sources.musicbrainz import (
     DEFAULT_INCLUDES,
@@ -52,6 +53,7 @@ class EntityAggregator:
         return results[:limit]
 
     async def resolve_identifier(self, identifier: str, *, language: str = "en") -> Entity:
+        language = validate_language(language)
         mbid = _extract_mbid_from_identifier(identifier)
         if mbid is not None:
             entity_match = await self._musicbrainz.probe(mbid)
@@ -63,7 +65,7 @@ class EntityAggregator:
         matches = await self._musicbrainz.resolve_url(_normalize_lookup_resource(identifier))
         if not matches:
             raise ValueError(f"Could not resolve identifier: {identifier}")
-        top_match = matches[0]
+        top_match = _select_unique_match(identifier, matches)
         return await self.aggregate_entity(
             top_match["mbid"],
             EntityType(top_match["entity_type"]),
@@ -77,6 +79,7 @@ class EntityAggregator:
         *,
         language: str = "en",
     ) -> Entity:
+        language = validate_language(language)
         payload = await self._musicbrainz.lookup(
             entity_type,
             mbid,
@@ -89,6 +92,14 @@ class EntityAggregator:
             wiki_facts = await self._wikipedia.get_wikidata_facts(
                 entity.external_ids.wikidata, language=language
             )
+        elif entity.mbid:
+            wiki_facts = await self._wikipedia.get_wikidata_facts_for_musicbrainz(
+                entity_type,
+                entity.mbid,
+                language=language,
+            )
+            if isinstance(wiki_facts.get("qid"), str):
+                entity.external_ids.wikidata = wiki_facts["qid"]
         wikipedia_title = (
             _title_from_wikipedia_url(entity.external_ids.wikipedia)
             if entity.external_ids.wikipedia
@@ -97,6 +108,9 @@ class EntityAggregator:
         if wikipedia_title:
             summary = await self._wikipedia.get_summary(wikipedia_title, language=language)
             if summary is not None:
+                extract = summary.get("extract")
+                if isinstance(extract, str) and extract:
+                    entity.metadata["wikipedia_extract"] = extract
                 entity.summary = _coalesce(
                     summary.get("extract"), summary.get("description"), entity.summary
                 )
@@ -135,6 +149,7 @@ class EntityAggregator:
         *,
         language: str = "en",
     ) -> Story:
+        language = validate_language(language)
         entity = await self.aggregate_entity(mbid, entity_type, language=language)
         facts = _facts_from_entity(entity)
         wikidata_facts = entity.metadata.get("wikidata_facts")
@@ -166,15 +181,20 @@ class EntityAggregator:
                         source="wikidata",
                     )
                 )
+        raw_extract = (
+            entity.metadata.get("wikipedia_extract")
+            if isinstance(entity.metadata.get("wikipedia_extract"), str)
+            else None
+        )
         return Story(
             entity_ref=entity,
             facts=facts,
-            wikipedia_extract=entity.summary,
+            wikipedia_extract=raw_extract,
             wikipedia_url=entity.metadata.get("wikipedia_url")
             if isinstance(entity.metadata.get("wikipedia_url"), str)
             else None,
             language=language,
-            context_depth="full" if entity.summary else "stub",
+            context_depth="full" if raw_extract else "stub",
         )
 
     async def get_related(
@@ -190,6 +210,7 @@ class EntityAggregator:
         return [relation for relation in entity.relations if relation.kind == kind]
 
     async def build_scene_story(self, scene_key: str, *, language: str = "en") -> Story:
+        language = validate_language(language)
         scene = load_scenes()[scene_key]
         entity = Entity(
             type=EntityType.SCENE,
@@ -201,11 +222,14 @@ class EntityAggregator:
                 "curated_angles": list(scene.curated_angles),
             },
         )
-        summary = None
+        raw_extract = None
         wikipedia_url = None
         if scene.wikipedia_key:
             summary = await self._wikipedia.get_summary(scene.wikipedia_key, language=language)
             if summary is not None:
+                extract = summary.get("extract")
+                if isinstance(extract, str) and extract:
+                    raw_extract = extract
                 entity.summary = _coalesce(summary.get("extract"), entity.summary)
                 wikipedia_url = _nested_get(summary, "content_urls", "desktop", "page")
         facts = [
@@ -224,14 +248,16 @@ class EntityAggregator:
         return Story(
             entity_ref=entity,
             facts=facts,
-            wikipedia_extract=entity.summary,
+            wikipedia_extract=raw_extract,
             wikipedia_url=wikipedia_url if isinstance(wikipedia_url, str) else None,
             language=language,
-            context_depth="full" if entity.summary else "stub",
+            context_depth="full" if raw_extract else "stub",
         )
 
     def _entity_from_musicbrainz(self, entity_type: EntityType, payload: dict[str, Any]) -> Entity:
         external_ids = _extract_external_ids(payload.get("relations", []))
+        if isinstance(payload.get("id"), str):
+            external_ids.musicbrainz = payload["id"]
         name = payload.get("name") or payload.get("title") or "Unknown"
         entity = Entity(
             type=entity_type,
@@ -298,6 +324,8 @@ def _extract_external_ids(relations: Any) -> ExternalIds:
             external_ids.wikidata = normalized.rsplit("/", 1)[-1]
         elif relation_type == "wikipedia":
             external_ids.wikipedia = normalized
+        elif relation_type == "isni":
+            external_ids.isni = _extract_isni(normalized)
         elif relation_type == "discogs":
             external_ids.discogs = normalized
         elif "spotify.com" in normalized:
@@ -311,6 +339,11 @@ def _extract_external_ids(relations: Any) -> ExternalIds:
         elif "tidal.com" in normalized:
             external_ids.tidal = normalized
     return external_ids
+
+
+def _extract_isni(resource: str) -> str | None:
+    candidate = resource.rstrip("/").rsplit("/", 1)[-1].replace(" ", "")
+    return candidate or None
 
 
 def _primary_date(payload: dict[str, Any]) -> str | None:
@@ -490,3 +523,14 @@ def _nested_get(data: dict[str, Any], *keys: str) -> Any:
 
 def _title_from_wikipedia_url(url: str) -> str:
     return url.rstrip("/").rsplit("/wiki/", 1)[-1]
+
+
+def _select_unique_match(identifier: str, matches: list[dict[str, str]]) -> dict[str, str]:
+    unique = {(match["entity_type"], match["mbid"]) for match in matches}
+    if len(unique) != 1:
+        raise ValueError(f"Identifier resolved ambiguously: {identifier}")
+    entity_type, mbid = next(iter(unique))
+    for match in matches:
+        if match["entity_type"] == entity_type and match["mbid"] == mbid:
+            return match
+    raise RuntimeError("unreachable")

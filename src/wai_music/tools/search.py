@@ -23,9 +23,12 @@ async def resolve_identifier(
     identifier: str,
     *,
     services: ServiceContainer,
-    language: str = "en",
+    language: str | None = None,
 ) -> Entity:
-    return await services.aggregator.resolve_identifier(identifier, language=language)
+    return await services.aggregator.resolve_identifier(
+        identifier,
+        language=language or services.settings.default_language,
+    )
 
 
 def register(mcp: FastMCP, services: ServiceContainer) -> None:
@@ -36,7 +39,7 @@ def register(mcp: FastMCP, services: ServiceContainer) -> None:
         return await search_entities(query, services=services, entity_type=type, limit=limit)
 
     @mcp.tool()
-    async def resolve(identifier: str, language: str = "en") -> Entity:
+    async def resolve(identifier: str, language: str | None = None) -> Entity:
         """Resolve a MusicBrainz MBID or external URL/identifier into a canonical entity."""
 
         return await resolve_identifier(identifier, services=services, language=language)

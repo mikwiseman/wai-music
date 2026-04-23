@@ -82,12 +82,16 @@ class Story(BaseModel):
     wikipedia_extract: str | None = None
     wikipedia_url: str | None = None
     language: str
-    context_depth: Literal["full", "stub"] = "full"
+    context_depth: Literal["full", "stub"] = "stub"
 
     @model_validator(mode="after")
     def validate_payload(self) -> Story:
         if not self.facts and not self.wikipedia_extract:
             raise ValueError("story requires facts or wikipedia_extract")
+        if self.wikipedia_extract and self.context_depth == "stub":
+            self.context_depth = "full"
+        if self.context_depth == "full" and not self.wikipedia_extract:
+            raise ValueError("full story requires wikipedia_extract")
         return self
 
 

@@ -10,6 +10,7 @@ from typing import Any
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
+from wai_music.backends.base import SavedTracksPage
 from wai_music.models import PlaylistRef, TrackDetails, TrackMatch, TrackQuery
 from wai_music.settings import WaiMusicSettings
 
@@ -26,6 +27,14 @@ class SpotifyBackend:
     def __init__(self, settings: WaiMusicSettings) -> None:
         self._settings = settings
         self._client: spotipy.Spotify | None = None
+
+    async def close(self) -> None:
+        if self._client is None:
+            return
+        session = getattr(self._client, "_session", None)
+        if session is not None:
+            await asyncio.to_thread(session.close)
+        self._client = None
 
     async def search_track(self, query: TrackQuery) -> list[TrackMatch]:
         search_query = _query_to_text(query)
@@ -74,14 +83,18 @@ class SpotifyBackend:
         top_tracks = await self._call("current_user_top_tracks", limit=20, time_range=time_range)
         return {"artists": top_artists.get("items", []), "tracks": top_tracks.get("items", [])}
 
-    async def get_saved(self, *, limit: int = 50) -> list[TrackMatch]:
+    async def get_saved(self, *, limit: int = 50) -> SavedTracksPage:
         payload = await self._call("current_user_saved_tracks", limit=limit)
         items = payload.get("items", [])
         saved: list[TrackMatch] = []
         for item in items:
             if isinstance(item, dict) and isinstance(item.get("track"), dict):
                 saved.append(_track_match_from_item(item["track"]))
-        return saved
+        total = payload.get("total")
+        return SavedTracksPage(
+            items=saved,
+            total=total if isinstance(total, int) else len(saved),
+        )
 
     async def _search_tracks(self, query: str) -> list[dict[str, Any]]:
         payload = await self._call("search", q=query, type="track", limit=10)
@@ -97,6 +110,11 @@ class SpotifyBackend:
         if self._client is None:
             if not self._settings.spotify_client_id or not self._settings.spotify_client_secret:
                 raise RuntimeError("Spotify credentials are not configured")
+            if not self._settings.spotify_cache_path.exists():
+                raise RuntimeError(
+                    f"Spotify token cache is missing at {self._settings.spotify_cache_path}. "
+                    "Run scripts/authorize_spotify.py first."
+                )
             auth_manager = SpotifyOAuth(
                 client_id=self._settings.spotify_client_id,
                 client_secret=self._settings.spotify_client_secret,
@@ -105,6 +123,11 @@ class SpotifyBackend:
                 cache_path=str(self._settings.spotify_cache_path),
                 open_browser=False,
             )
+            if auth_manager.validate_token(auth_manager.cache_handler.get_cached_token()) is None:
+                raise RuntimeError(
+                    f"Spotify token cache at {self._settings.spotify_cache_path} is missing, "
+                    "expired, or invalid. Re-authorize with scripts/authorize_spotify.py."
+                )
             self._client = spotipy.Spotify(auth_manager=auth_manager)
         return self._client
 

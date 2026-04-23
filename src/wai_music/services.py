@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from inspect import isawaitable
 
 from wai_music.aggregator import EntityAggregator
 from wai_music.backends.base import BackendRegistry
@@ -21,10 +22,30 @@ class ServiceContainer:
     wikipedia: WikipediaSource
     aggregator: EntityAggregator
     backends: BackendRegistry
+    _closed: bool = field(default=False, init=False, repr=False)
 
     async def close(self) -> None:
-        await self.musicbrainz.close()
-        await self.wikipedia.close()
+        if self._closed:
+            return
+        errors: list[Exception] = []
+        closers = [self.musicbrainz.close, self.wikipedia.close]
+        for backend_name in self.backends.names():
+            backend = self.backends.get(backend_name)
+            backend_close = getattr(backend, "close", None)
+            if callable(backend_close):
+                closers.append(backend_close)
+
+        for close in closers:
+            try:
+                result = close()
+                if isawaitable(result):
+                    await result
+            except Exception as exc:
+                errors.append(exc)
+
+        if errors:
+            raise ExceptionGroup("failed to close wai-music services", errors)
+        self._closed = True
 
 
 def create_services(settings: WaiMusicSettings | None = None) -> ServiceContainer:

@@ -3,9 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 from wai_music.models import PlaylistRef, TrackDetails, TrackMatch, TrackQuery
+
+
+@dataclass(frozen=True)
+class SavedTracksPage:
+    items: list[TrackMatch]
+    total: int
 
 
 @runtime_checkable
@@ -28,7 +35,7 @@ class PlaybackBackend(Protocol):
 
     async def get_user_top(self, *, time_range: str = "medium_term") -> dict[str, Any]: ...
 
-    async def get_saved(self, *, limit: int = 50) -> list[TrackMatch]: ...
+    async def get_saved(self, *, limit: int = 50) -> SavedTracksPage: ...
 
 
 class BackendRegistry:

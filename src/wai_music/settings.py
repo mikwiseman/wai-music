@@ -7,6 +7,8 @@ from pathlib import Path
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from wai_music.languages import validate_language
+
 
 class WaiMusicSettings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -46,6 +48,11 @@ class WaiMusicSettings(BaseSettings):
         if isinstance(value, str):
             return Path(value).expanduser()
         return value
+
+    @field_validator("default_language")
+    @classmethod
+    def validate_default_language(cls, value: str) -> str:
+        return validate_language(value)
 
     @property
     def spotify_scopes(self) -> list[str]:

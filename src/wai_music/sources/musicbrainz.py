@@ -8,6 +8,8 @@ from collections.abc import Sequence
 from typing import Any
 from urllib.parse import urlencode, urlparse
 
+import httpx
+
 from wai_music.cache import SQLiteCache
 from wai_music.http import JsonHttpClient
 from wai_music.models import EntityType
@@ -90,8 +92,10 @@ class MusicBrainzSource:
         ):
             try:
                 payload = await self.lookup(entity_type, mbid)
-            except Exception:
-                continue
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code in {400, 404}:
+                    continue
+                raise
             return entity_type, payload
         return None
 
@@ -131,7 +135,15 @@ class MusicBrainzSource:
                                     "relation_type": str(relation.get("type", "")),
                                 }
                             )
-        return matches
+        unique_matches: list[dict[str, str]] = []
+        seen: set[tuple[str, str]] = set()
+        for match in matches:
+            key = (match["entity_type"], match["mbid"])
+            if key in seen:
+                continue
+            seen.add(key)
+            unique_matches.append(match)
+        return unique_matches
 
     async def _request_json(
         self,

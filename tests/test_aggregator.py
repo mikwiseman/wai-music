@@ -33,10 +33,24 @@ class FakeMusicBrainz:
         return EntityType.ARTIST, {"id": mbid}
 
     async def resolve_url(self, resource: str):
+        if resource == "ambiguous":
+            return [
+                {"entity_type": "artist", "mbid": "artist-mbid", "name": "Miles Davis"},
+                {"entity_type": "release", "mbid": "release-mbid", "name": "Kind of Blue"},
+            ]
         return [{"entity_type": "artist", "mbid": "artist-mbid", "name": "Miles Davis"}]
 
     async def lookup(self, entity_type, mbid, includes=None):
         assert entity_type is EntityType.ARTIST
+        if mbid == "fallback-mbid":
+            return {
+                "id": mbid,
+                "name": "Fallback Artist",
+                "country": "US",
+                "life-span": {"begin": "1970-01-01"},
+                "relations": [],
+                "tags": [{"name": "fusion"}],
+            }
         return {
             "id": mbid,
             "name": "Miles Davis",
@@ -69,12 +83,38 @@ class FakeWikipedia:
             "wikipedia_title": "Miles_Davis",
         }
 
+    async def get_wikidata_facts_for_musicbrainz(
+        self, entity_type, mbid: str, *, language: str = "en"
+    ):
+        assert entity_type is EntityType.ARTIST
+        if mbid == "fallback-mbid":
+            return {
+                "qid": "Q999",
+                "label": "Fallback Artist",
+                "birth_date": "1970-01-01T00:00:00Z",
+                "death_date": None,
+                "inception_date": None,
+                "wikipedia_title": "Fallback_Artist",
+            }
+        return {}
+
     async def get_summary(self, title: str, *, language: str = "en"):
         if title == "Miles_Davis":
             return {
                 "extract": "American jazz trumpeter.",
                 "content_urls": {"desktop": {"page": "https://en.wikipedia.org/wiki/Miles_Davis"}},
-                "thumbnail": {"source": "https://example.com/miles.jpg", "width": 100, "height": 200},
+                "thumbnail": {
+                    "source": "https://example.com/miles.jpg",
+                    "width": 100,
+                    "height": 200,
+                },
+            }
+        if title == "Fallback_Artist":
+            return {
+                "extract": "Fallback biography.",
+                "content_urls": {
+                    "desktop": {"page": "https://en.wikipedia.org/wiki/Fallback_Artist"}
+                },
             }
         return {
             "extract": "Machine-funk futurism from Detroit.",
@@ -97,8 +137,10 @@ async def test_aggregator_builds_entity_and_story() -> None:
 
     assert entity.summary == "American jazz trumpeter."
     assert entity.external_ids.wikidata == "Q1150"
+    assert entity.external_ids.musicbrainz == "artist-mbid"
     assert entity.relations[0].target_name == "Charlie Parker"
     assert story.wikipedia_extract == "American jazz trumpeter."
+    assert story.context_depth == "full"
     assert len(story.facts) >= 3
     assert resolved.name == "Miles Davis"
     assert searched[0].name == "Miles Davis"
@@ -158,10 +200,17 @@ async def test_aggregator_scene_story_and_helpers() -> None:
         [
             {"type": "wikidata", "url": {"resource": "https://www.wikidata.org/wiki/Q1150"}},
             {"type": "wikipedia", "url": {"resource": "https://en.wikipedia.org/wiki/Miles_Davis"}},
+            {"type": "isni", "url": {"resource": "https://isni.org/isni/000000012146438X"}},
             {"type": "discogs", "url": {"resource": "https://www.discogs.com/artist/23755"}},
             {"type": "streaming music", "url": {"resource": "https://open.spotify.com/artist/abc"}},
-            {"type": "social network", "url": {"resource": "https://genius.com/artists/Miles-Davis"}},
-            {"type": "purchase for download", "url": {"resource": "https://music.apple.com/us/artist/miles/1"}},
+            {
+                "type": "social network",
+                "url": {"resource": "https://genius.com/artists/Miles-Davis"},
+            },
+            {
+                "type": "purchase for download",
+                "url": {"resource": "https://music.apple.com/us/artist/miles/1"},
+            },
             {"type": "free streaming", "url": {"resource": "https://www.deezer.com/us/artist/111"}},
             {"type": "streaming", "url": {"resource": "https://tidal.com/browse/artist/222"}},
         ]
@@ -176,23 +225,42 @@ async def test_aggregator_scene_story_and_helpers() -> None:
     facts = _facts_from_entity(sample_entity)
 
     assert story.entity_ref.name == "Detroit Techno"
+    assert story.context_depth == "full"
     assert release_children[0].mbid == "recording-1"
     assert work_children[0].name == "Blue in Green"
     assert recording_children[0].primary_date == "1959-08-17"
     assert relations[0].direction == "forward"
     assert external_ids.wikidata == "Q1150"
     assert external_ids.wikipedia == "https://en.wikipedia.org/wiki/Miles_Davis"
+    assert external_ids.isni == "000000012146438X"
     assert external_ids.spotify == "https://open.spotify.com/artist/abc"
     assert external_ids.genius == "https://genius.com/artists/Miles-Davis"
     assert external_ids.apple_music == "https://music.apple.com/us/artist/miles/1"
     assert external_ids.deezer == "https://www.deezer.com/us/artist/111"
     assert external_ids.tidal == "https://tidal.com/browse/artist/222"
     assert facts[0].date == "1926-05-26"
-    assert _extract_mbid_from_identifier("https://musicbrainz.org/artist/123e4567-e89b-12d3-a456-426614174000")
+    assert _extract_mbid_from_identifier(
+        "https://musicbrainz.org/artist/123e4567-e89b-12d3-a456-426614174000"
+    )
     assert _primary_date({"life-span": {"begin": "1926-05-26"}}) == "1926-05-26"
     assert _primary_date({"date": "1959"}) == "1959"
     assert _country({"area": {"name": "United States"}}) == "United States"
-    assert _first_str({"comment": "disambiguation"}, "disambiguation", "comment") == "disambiguation"
+    assert (
+        _first_str({"comment": "disambiguation"}, "disambiguation", "comment") == "disambiguation"
+    )
     assert _coalesce(None, "", "value") == "value"
     assert _nested_get({"a": {"b": {"c": 3}}}, "a", "b", "c") == 3
     assert _title_from_wikipedia_url("https://en.wikipedia.org/wiki/Miles_Davis") == "Miles_Davis"
+
+
+@pytest.mark.asyncio
+async def test_aggregator_uses_musicbrainz_wikidata_fallback_and_rejects_ambiguity() -> None:
+    aggregator = EntityAggregator(FakeMusicBrainz(), FakeWikipedia())
+
+    entity = await aggregator.aggregate_entity("fallback-mbid", EntityType.ARTIST, language="en")
+
+    assert entity.external_ids.wikidata == "Q999"
+    assert entity.summary == "Fallback biography."
+
+    with pytest.raises(ValueError, match="ambiguously"):
+        await aggregator.resolve_identifier("ambiguous", language="en")
