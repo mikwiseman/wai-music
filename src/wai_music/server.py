@@ -29,6 +29,7 @@ def build_server(
     settings: WaiMusicSettings | None = None,
     host: str | None = None,
     port: int | None = None,
+    close_services_on_lifespan_shutdown: bool = True,
 ) -> FastMCP:
     configured_candidate = settings if settings is not None else getattr(services, "settings", None)
     configured = (
@@ -46,7 +47,8 @@ def build_server(
         try:
             yield services
         finally:
-            await services.close()
+            if close_services_on_lifespan_shutdown:
+                await services.close()
 
     oauth_provider: WaiOAuthProvider | None = None
     auth_settings = None
@@ -91,7 +93,11 @@ def build_web_app(
     settings: WaiMusicSettings | None = None,
 ) -> Starlette:
     configured = settings or services.settings
-    mcp = build_server(services, settings=configured)
+    mcp = build_server(
+        services,
+        settings=configured,
+        close_services_on_lifespan_shutdown=False,
+    )
     oauth_provider = (
         WaiOAuthProvider(store=services.auth_store, settings=configured)
         if configured.oauth_enabled

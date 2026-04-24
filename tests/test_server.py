@@ -62,3 +62,25 @@ def test_server_registers_tool_safety_annotations() -> None:
     assert save_notes_tool.annotations.readOnlyHint is False
     assert save_notes_tool.annotations.destructiveHint is True
     assert save_notes_tool.annotations.openWorldHint is False
+
+
+def test_server_lifespan_close_can_be_deferred_to_host_app() -> None:
+    close_calls = 0
+
+    async def close() -> None:
+        nonlocal close_calls
+        close_calls += 1
+
+    async def run_lifespan(close_on_shutdown: bool) -> None:
+        server = build_server(
+            SimpleNamespace(close=close),
+            close_services_on_lifespan_shutdown=close_on_shutdown,
+        )
+        async with server._mcp_server.lifespan(server._mcp_server):
+            pass
+
+    asyncio.run(run_lifespan(close_on_shutdown=False))
+    assert close_calls == 0
+
+    asyncio.run(run_lifespan(close_on_shutdown=True))
+    assert close_calls == 1
