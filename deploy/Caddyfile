@@ -12,3 +12,22 @@ music.waiwai.is {
     flush_interval -1
   }
 }
+
+money.waiwai.is {
+  tls /data/manual-certs/money.waiwai.is/fullchain.pem /data/manual-certs/money.waiwai.is/privkey.pem
+  encode zstd gzip
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    X-Frame-Options "DENY"
+  }
+
+  reverse_proxy https://135.181.200.158 {
+    header_up Host {host}
+    transport http {
+      tls_server_name money.waiwai.is
+    }
+  }
+}
