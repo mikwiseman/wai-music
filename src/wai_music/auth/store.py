@@ -522,6 +522,7 @@ class SQLiteAuthStore:
             "user_id": user_id,
             "scopes": scopes,
             "expires_at": int(time.time()) + refresh_ttl_seconds,
+            "resource": resource,
         }
         with self._connect() as connection:
             connection.execute(

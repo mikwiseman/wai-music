@@ -26,6 +26,7 @@ class WaiAuthorizationCode(AuthorizationCode):
 
 class WaiRefreshToken(RefreshToken):
     user_id: str
+    resource: str | None = None
 
 
 class WaiAccessToken(AccessToken):
@@ -133,6 +134,7 @@ class WaiOAuthProvider(
             if payload.get("expires_at") is not None
             else None,
             user_id=str(payload["user_id"]),
+            resource=payload.get("resource"),
         )
 
     async def exchange_refresh_token(
@@ -141,13 +143,16 @@ class WaiOAuthProvider(
         refresh_token: WaiRefreshToken,
         scopes: list[str],
     ) -> OAuthToken:
-        self._store.delete_refresh_token(refresh_token.token)
+        # Keep the prior refresh token usable until normal expiry. Some MCP hosts
+        # retry refreshes or fail to persist the replacement token; immediate
+        # invalidation traps those clients in an invalid_grant loop.
         return self._store.issue_oauth_token_pair(
             user_id=refresh_token.user_id,
             client_id=_client_id(client),
             scopes=scopes,
             access_ttl_seconds=self._settings.oauth_access_token_ttl_seconds,
             refresh_ttl_seconds=self._settings.oauth_refresh_token_ttl_seconds,
+            resource=refresh_token.resource,
         )
 
     async def load_access_token(self, token: str) -> WaiAccessToken | None:
