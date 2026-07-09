@@ -1,6 +1,17 @@
 import pytest
 
-from wai_music.models import DailyPick, Entity, EntityType, Fact, PlaylistRef, SavedNotes, Story
+from wai_music.models import (
+    DailyPick,
+    Entity,
+    EntityType,
+    Fact,
+    MusicFinderCandidate,
+    MusicFinderChoices,
+    MusicFinderResult,
+    PlaylistRef,
+    SavedNotes,
+    Story,
+)
 
 
 def test_entity_schema_is_generatable() -> None:
@@ -45,3 +56,34 @@ def test_daily_pick_and_saved_notes_serialize() -> None:
         entities=[entity],
     )
     assert saved.model_dump()["playlist_ref"]["backend"] == "spotify"
+
+
+def test_music_finder_models_normalize_and_serialize() -> None:
+    choices = MusicFinderChoices(
+        query="late-night jazz",
+        genres=["Jazz", " jazz "],
+        moods=["Reflective"],
+        energy=45,
+        discovery_depth="balanced",
+    )
+    candidate = MusicFinderCandidate(
+        rank=1,
+        entity=Entity(type=EntityType.RELEASE, name="Kind of Blue"),
+        score=91.5,
+        reasons=["genre: jazz"],
+        matched_choices=["late-night jazz", "jazz"],
+        source="curated",
+        spotify_query="Miles Davis Kind of Blue",
+    )
+    result = MusicFinderResult(
+        choices=choices,
+        candidates=[candidate],
+        mcp_prompt="Find music for late-night jazz.",
+    )
+
+    payload = result.model_dump(mode="json")
+
+    assert payload["choices"]["genres"] == ["jazz"]
+    assert payload["choices"]["moods"] == ["reflective"]
+    assert payload["candidates"][0]["source"] == "curated"
+    assert MusicFinderResult.model_json_schema()["title"] == "MusicFinderResult"

@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class EntityType(StrEnum):
@@ -151,6 +151,105 @@ class ListeningProfile(BaseModel):
     inferred_genres: list[str] = Field(default_factory=list)
 
 
+MusicFinderIntent = Literal[
+    "playlist",
+    "track",
+    "album",
+    "artist",
+    "scene",
+    "daily_pick",
+]
+
+MusicFinderSource = Literal[
+    "curated",
+    "spotify_profile",
+    "manual_seed",
+    "scene_dive",
+]
+
+DiscoveryDepth = Literal["familiar", "balanced", "adventurous"]
+
+
+class MusicFinderChoices(BaseModel):
+    model_config = ConfigDict(title="MusicFinderChoices")
+
+    intent: MusicFinderIntent = "playlist"
+    source: MusicFinderSource = "curated"
+    query: str | None = None
+    genres: list[str] = Field(default_factory=list)
+    moods: list[str] = Field(default_factory=list)
+    scene_keys: list[str] = Field(default_factory=list)
+    artists: list[str] = Field(default_factory=list)
+    eras: list[str] = Field(default_factory=list)
+    formats: list[str] = Field(default_factory=list)
+    avoid: list[str] = Field(default_factory=list)
+    energy: int | None = Field(default=None, ge=0, le=100)
+    discovery_depth: DiscoveryDepth = "balanced"
+    include_tracks: bool = True
+    use_listening_profile: bool = False
+    time_range: str = "medium_term"
+    limit: int = Field(default=5, ge=1, le=20)
+    language: str | None = None
+
+    @field_validator(
+        "genres",
+        "moods",
+        "scene_keys",
+        "artists",
+        "eras",
+        "formats",
+        "avoid",
+        mode="before",
+    )
+    @classmethod
+    def normalize_terms(cls, value: object) -> list[str]:
+        if value is None:
+            return []
+        raw_items = value if isinstance(value, list) else [value]
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for item in raw_items:
+            if not isinstance(item, str):
+                continue
+            term = " ".join(item.strip().lower().split())
+            if term and term not in seen:
+                seen.add(term)
+                normalized.append(term)
+        return normalized
+
+    @field_validator("query", mode="before")
+    @classmethod
+    def normalize_query(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            return None
+        normalized = " ".join(value.strip().split())
+        return normalized or None
+
+
+class MusicFinderCandidate(BaseModel):
+    model_config = ConfigDict(title="MusicFinderCandidate")
+
+    rank: int = Field(ge=1)
+    entity: Entity
+    track: TrackMatch | None = None
+    score: float
+    reasons: list[str] = Field(default_factory=list)
+    matched_choices: list[str] = Field(default_factory=list)
+    source: Literal["curated", "scene", "search", "profile"]
+    spotify_query: str | None = None
+
+
+class MusicFinderResult(BaseModel):
+    model_config = ConfigDict(title="MusicFinderResult")
+
+    choices: MusicFinderChoices
+    candidates: list[MusicFinderCandidate] = Field(default_factory=list)
+    profile_summary: ListeningProfile | None = None
+    mcp_prompt: str
+
+
 DailyMode = Literal[
     "anniversary",
     "seasonal",
@@ -178,12 +277,18 @@ class SavedNotes(BaseModel):
 __all__ = [
     "DailyMode",
     "DailyPick",
+    "DiscoveryDepth",
     "Entity",
     "EntityType",
     "ExternalIds",
     "Fact",
     "ImageRef",
     "ListeningProfile",
+    "MusicFinderCandidate",
+    "MusicFinderChoices",
+    "MusicFinderIntent",
+    "MusicFinderResult",
+    "MusicFinderSource",
     "PlaylistCreationResult",
     "PlaylistRef",
     "RelationRef",

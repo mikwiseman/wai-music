@@ -19,7 +19,17 @@ from wai_music.logging_config import configure_logging
 from wai_music.services import ServiceContainer, create_services
 from wai_music.settings import WaiMusicSettings
 from wai_music.telemetry import configure_sentry
-from wai_music.tools import artifacts, daily, entities, playback, profile, related, search, stories
+from wai_music.tools import (
+    artifacts,
+    daily,
+    entities,
+    finder,
+    playback,
+    profile,
+    related,
+    search,
+    stories,
+)
 from wai_music.web import build_web_routes
 
 
@@ -78,6 +88,7 @@ def build_server(
     search.register(mcp, services)
     entities.register(mcp, services)
     related.register(mcp, services)
+    finder.register(mcp, services)
     stories.register(mcp, services)
     playback.register(mcp, services)
     profile.register(mcp, services)

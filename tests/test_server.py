@@ -32,7 +32,8 @@ def test_server_parser_and_builder() -> None:
     assert args.http is True
     assert args.port == 9999
     assert isinstance(server, FastMCP)
-    assert len(tool_names) == 17
+    assert len(tool_names) == 18
+    assert "find_music" in tool_names
     assert "health_check" not in tool_names
 
 
@@ -40,6 +41,7 @@ def test_server_registers_tool_safety_annotations() -> None:
     server = build_server(SimpleNamespace(close=lambda: None))
 
     search_tool = asyncio.run(_tool_by_name(server, "search"))
+    find_music_tool = asyncio.run(_tool_by_name(server, "find_music"))
     create_playlist_tool = asyncio.run(_tool_by_name(server, "create_playlist"))
     add_tracks_tool = asyncio.run(_tool_by_name(server, "add_tracks_to_playlist"))
     save_notes_tool = asyncio.run(_tool_by_name(server, "save_notes"))
@@ -47,6 +49,10 @@ def test_server_registers_tool_safety_annotations() -> None:
     assert search_tool.annotations is not None
     assert search_tool.annotations.readOnlyHint is True
     assert search_tool.annotations.destructiveHint is False
+
+    assert find_music_tool.annotations is not None
+    assert find_music_tool.annotations.readOnlyHint is True
+    assert find_music_tool.annotations.destructiveHint is False
 
     assert create_playlist_tool.annotations is not None
     assert create_playlist_tool.annotations.readOnlyHint is False

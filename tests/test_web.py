@@ -50,7 +50,87 @@ def test_hosted_web_dashboard_and_healthz(tmp_path: Path) -> None:
         assert "user@example.com" in dashboard.text
         assert "http://localhost:8765/mcp" in dashboard.text
         assert "No API key or manual token is required" in dashboard.text
+        assert "Find music" in dashboard.text
         assert "Generate token" not in dashboard.text
+
+
+def test_find_route_requires_session(tmp_path: Path) -> None:
+    settings = _hosted_settings(tmp_path)
+    services = create_services(settings)
+    app = build_web_app(services, settings=settings)
+
+    with TestClient(app) as client:
+        response = client.get("/find", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/sign-in?next=/find"
+
+
+def test_find_page_disconnected_state_and_generated_prompt(tmp_path: Path) -> None:
+    settings = _hosted_settings(tmp_path)
+    services = create_services(settings)
+    app = build_web_app(services, settings=settings)
+
+    with TestClient(app) as client:
+        sign_up = client.post(
+            "/sign-up",
+            data={"email": "user@example.com", "password": "correct horse battery staple"},
+            follow_redirects=False,
+        )
+        assert sign_up.status_code == 303
+
+        page = client.get("/find")
+        assert page.status_code == 200
+        assert "Connect Spotify to use your listening profile" in page.text
+        assert "Use this with Claude after connecting wai-music" in page.text
+
+        generated = client.post(
+            "/find",
+            data={
+                "intent": "playlist",
+                "source": "curated",
+                "mood": "reflective",
+                "energy": "45",
+                "depth": "balanced",
+                "era": "90s",
+                "format": "album",
+                "seed": "late night jazz",
+            },
+        )
+
+    assert generated.status_code == 200
+    assert "late night jazz" in generated.text
+    assert "intent: playlist" in generated.text
+    assert "data-copy=" in generated.text
+    assert "Use as seed" in generated.text
+
+
+def test_find_page_connected_state_mentions_spotify_profile(tmp_path: Path) -> None:
+    settings = _hosted_settings(tmp_path)
+    services = create_services(settings)
+    app = build_web_app(services, settings=settings)
+
+    user = services.auth_store.create_user(
+        email="user@example.com",
+        password="correct horse battery staple",
+    )
+    session_token = services.auth_store.create_session(
+        user_id=user.user_id,
+        ttl_seconds=settings.session_ttl_seconds,
+    )
+    services.auth_store.upsert_spotify_connection(
+        user_id=user.user_id,
+        spotify_user_id="spotify-user-1",
+        token_payload={"access_token": "access", "refresh_token": "refresh"},
+    )
+
+    with TestClient(app) as client:
+        client.cookies.set(settings.session_cookie_name, session_token)
+        response = client.get("/find")
+
+    assert response.status_code == 200
+    assert "Spotify profile" in response.text
+    assert "spotify-user-1" in response.text
 
 
 def test_personal_access_token_can_be_created_from_dashboard(tmp_path: Path) -> None:

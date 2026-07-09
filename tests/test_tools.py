@@ -10,9 +10,17 @@ from mcp.server.auth.middleware.bearer_auth import AuthenticatedUser
 from wai_music.auth.oauth import WaiAccessToken
 from wai_music.backends.base import BackendRegistry, SavedTracksPage
 from wai_music.cache import SQLiteCache
-from wai_music.models import Entity, EntityType, PlaylistRef, RelationRef, TrackMatch
+from wai_music.models import (
+    Entity,
+    EntityType,
+    MusicFinderChoices,
+    PlaylistRef,
+    RelationRef,
+    TrackMatch,
+)
 from wai_music.tools.artifacts import save_markdown_notes
 from wai_music.tools.daily import composition_pick
+from wai_music.tools.finder import find_music_for_choices
 from wai_music.tools.playback import create_backend_playlist
 from wai_music.tools.profile import build_profile
 from wai_music.tools.related import get_related_entities
@@ -99,6 +107,11 @@ class FakeBackend:
             ],
             total=42,
         )
+
+
+class EmptyFakeBackend(FakeBackend):
+    async def search_track(self, query):
+        return []
 
 
 @pytest.mark.asyncio
@@ -264,6 +277,62 @@ async def test_daily_picker_modes_are_valid(settings, tmp_db_path) -> None:
     assert len({pick.entity.name for pick in week}) >= 2
     assert picks[0].entity.summary == "ru"
     assert picks[0].suggested_actions[0].startswith("Открой")
+
+
+@pytest.mark.asyncio
+async def test_music_finder_scores_curated_choices_and_track_matches(settings, tmp_db_path) -> None:
+    registry = BackendRegistry()
+    registry.register(FakeBackend())
+    services = SimpleNamespace(
+        aggregator=FakeAggregator(),
+        backends=registry,
+        cache=SQLiteCache(tmp_db_path),
+        settings=settings,
+    )
+
+    result = await find_music_for_choices(
+        MusicFinderChoices(
+            query="late night jazz",
+            genres=["jazz"],
+            moods=["reflective"],
+            energy=45,
+            discovery_depth="balanced",
+            limit=3,
+        ),
+        services=services,
+    )
+
+    assert result.candidates
+    assert result.candidates[0].rank == 1
+    assert result.candidates[0].track is not None
+    assert result.candidates[0].track.name == "Blue in Green"
+    assert "late night jazz" in result.mcp_prompt
+    assert "jazz" in result.candidates[0].matched_choices
+
+
+@pytest.mark.asyncio
+async def test_music_finder_can_return_entity_only_candidates(settings, tmp_db_path) -> None:
+    registry = BackendRegistry()
+    registry.register(EmptyFakeBackend())
+    services = SimpleNamespace(
+        aggregator=FakeAggregator(),
+        backends=registry,
+        cache=SQLiteCache(tmp_db_path),
+        settings=settings,
+    )
+
+    result = await find_music_for_choices(
+        MusicFinderChoices(
+            genres=["electronic"],
+            include_tracks=False,
+            limit=2,
+        ),
+        services=services,
+    )
+
+    assert len(result.candidates) == 2
+    assert all(candidate.track is None for candidate in result.candidates)
+    assert all(candidate.source in {"curated", "scene"} for candidate in result.candidates)
 
 
 @pytest.mark.asyncio

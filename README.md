@@ -11,25 +11,26 @@ The canonical metadata spine is MusicBrainz. Playback is backend-based from day 
 
 ## What It Exposes
 
-`wai-music` ships 17 MCP tools:
+`wai-music` ships 18 MCP tools:
 
 1. `search`
 2. `resolve`
-3. `get_artist`
-4. `get_release`
-5. `get_recording`
-6. `get_work`
-7. `get_related`
-8. `get_artist_story`
-9. `get_release_story`
-10. `get_recording_story`
-11. `get_scene_story`
-12. `find_track_on`
-13. `create_playlist`
-14. `add_tracks_to_playlist`
-15. `get_listening_profile`
-16. `composition_of_the_day`
-17. `save_notes`
+3. `find_music`
+4. `get_artist`
+5. `get_release`
+6. `get_recording`
+7. `get_work`
+8. `get_related`
+9. `get_artist_story`
+10. `get_release_story`
+11. `get_recording_story`
+12. `get_scene_story`
+13. `find_track_on`
+14. `create_playlist`
+15. `add_tracks_to_playlist`
+16. `get_listening_profile`
+17. `composition_of_the_day`
+18. `save_notes`
 
 Every tool returns Pydantic models. Public models live in `wai_music.models`.
 
