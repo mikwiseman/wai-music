@@ -29,6 +29,7 @@ from wai_music.tools import (
     related,
     search,
     stories,
+    workflow,
 )
 from wai_music.web import build_web_routes
 
@@ -94,6 +95,7 @@ def build_server(
     profile.register(mcp, services)
     daily.register(mcp, services)
     artifacts.register(mcp, services)
+    workflow.register(mcp, services)
 
     return mcp
 

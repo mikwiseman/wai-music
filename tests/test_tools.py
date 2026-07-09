@@ -25,6 +25,7 @@ from wai_music.tools.playback import create_backend_playlist
 from wai_music.tools.profile import build_profile
 from wai_music.tools.related import get_related_entities
 from wai_music.tools.search import search_entities
+from wai_music.tools.workflow import build_music_discovery_plan
 
 
 class FakeAggregator:
@@ -333,6 +334,43 @@ async def test_music_finder_can_return_entity_only_candidates(settings, tmp_db_p
     assert len(result.candidates) == 2
     assert all(candidate.track is None for candidate in result.candidates)
     assert all(candidate.source in {"curated", "scene"} for candidate in result.candidates)
+
+
+@pytest.mark.asyncio
+async def test_music_discovery_plan_maps_catalogs_and_workflow(settings, tmp_db_path) -> None:
+    registry = BackendRegistry()
+    registry.register(EmptyFakeBackend())
+    services = SimpleNamespace(
+        aggregator=FakeAggregator(),
+        backends=registry,
+        cache=SQLiteCache(tmp_db_path),
+        settings=settings,
+    )
+
+    plan = await build_music_discovery_plan(
+        MusicFinderChoices(
+            query="portishead after midnight",
+            source="manual_seed",
+            moods=["focused"],
+            genres=["electronic"],
+            include_tracks=False,
+            limit=2,
+        ),
+        services=services,
+        spotify_connected=False,
+    )
+
+    catalog_status = {catalog.key: catalog.status for catalog in plan.catalogs}
+    step_labels = [step.label for step in plan.workflow_steps]
+
+    assert plan.result.candidates
+    assert catalog_status["musicbrainz"] == "active"
+    assert catalog_status["spotify"] == "available"
+    assert catalog_status["listenbrainz"] == "planned"
+    assert "Rank candidates" in step_labels
+    assert "Create playlist" in step_labels
+    assert "do not claim live access" in plan.mcp_prompt
+    assert "Do not create or modify playlists" in plan.mcp_prompt
 
 
 @pytest.mark.asyncio

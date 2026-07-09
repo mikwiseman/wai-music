@@ -250,6 +250,45 @@ class MusicFinderResult(BaseModel):
     mcp_prompt: str
 
 
+CatalogStatus = Literal["active", "available", "planned"]
+
+
+class CatalogSignal(BaseModel):
+    model_config = ConfigDict(title="CatalogSignal")
+
+    key: str
+    name: str
+    status: CatalogStatus
+    role: str
+    best_for: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+    tool_hint: str | None = None
+    requires: list[str] = Field(default_factory=list)
+    source_url: str | None = None
+
+
+WorkflowStepStatus = Literal["ready", "optional", "requires_connection", "planned"]
+
+
+class DiscoveryWorkflowStep(BaseModel):
+    model_config = ConfigDict(title="DiscoveryWorkflowStep")
+
+    label: str
+    tool_names: list[str] = Field(default_factory=list)
+    reason: str
+    status: WorkflowStepStatus = "ready"
+
+
+class MusicDiscoveryPlan(BaseModel):
+    model_config = ConfigDict(title="MusicDiscoveryPlan")
+
+    choices: MusicFinderChoices
+    result: MusicFinderResult
+    catalogs: list[CatalogSignal] = Field(default_factory=list)
+    workflow_steps: list[DiscoveryWorkflowStep] = Field(default_factory=list)
+    mcp_prompt: str
+
+
 DailyMode = Literal[
     "anniversary",
     "seasonal",
@@ -275,15 +314,19 @@ class SavedNotes(BaseModel):
 
 
 __all__ = [
+    "CatalogSignal",
+    "CatalogStatus",
     "DailyMode",
     "DailyPick",
     "DiscoveryDepth",
+    "DiscoveryWorkflowStep",
     "Entity",
     "EntityType",
     "ExternalIds",
     "Fact",
     "ImageRef",
     "ListeningProfile",
+    "MusicDiscoveryPlan",
     "MusicFinderCandidate",
     "MusicFinderChoices",
     "MusicFinderIntent",
@@ -297,4 +340,5 @@ __all__ = [
     "TrackDetails",
     "TrackMatch",
     "TrackQuery",
+    "WorkflowStepStatus",
 ]

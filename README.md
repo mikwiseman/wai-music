@@ -11,28 +11,34 @@ The canonical metadata spine is MusicBrainz. Playback is backend-based from day 
 
 ## What It Exposes
 
-`wai-music` ships 18 MCP tools:
+`wai-music` ships 19 MCP tools:
 
 1. `search`
 2. `resolve`
 3. `find_music`
-4. `get_artist`
-5. `get_release`
-6. `get_recording`
-7. `get_work`
-8. `get_related`
-9. `get_artist_story`
-10. `get_release_story`
-11. `get_recording_story`
-12. `get_scene_story`
-13. `find_track_on`
-14. `create_playlist`
-15. `add_tracks_to_playlist`
-16. `get_listening_profile`
-17. `composition_of_the_day`
-18. `save_notes`
+4. `plan_music_discovery`
+5. `get_artist`
+6. `get_release`
+7. `get_recording`
+8. `get_work`
+9. `get_related`
+10. `get_artist_story`
+11. `get_release_story`
+12. `get_recording_story`
+13. `get_scene_story`
+14. `find_track_on`
+15. `create_playlist`
+16. `add_tracks_to_playlist`
+17. `get_listening_profile`
+18. `composition_of_the_day`
+19. `save_notes`
 
 Every tool returns Pydantic models. Public models live in `wai_music.models`.
+
+The MCP server also exposes:
+
+- resource `wai-music://catalogs/discovery` for catalog capability, limits, and source status
+- prompt `music_discovery_session` for source-aware discovery sessions
 
 ## Installation
 
@@ -217,6 +223,21 @@ The package includes starter curated data under `src/wai_music/data/`:
 
 The data is intentionally editable and expandable. Some starter `must_hear` entries are seeded without verified MBIDs yet; the file format is stable so the editorial dataset can be tightened without changing tool interfaces.
 
+## Source Catalog Strategy
+
+Current implemented sources:
+
+- MusicBrainz for canonical IDs, relations, tags, releases, recordings, and works
+- Wikipedia / Wikidata for story context and factual grounding
+- Spotify for user listening profile, playable track search, and playlist writes
+- Wai curated data for fast first-pass recommendations and scene anchors
+
+Planned adapter slots:
+
+- ListenBrainz for MBID-first collaborative recommendations
+- Last.fm for similar artists and community tags
+- Discogs for label, pressing, format, and catalog-number context
+
 ## Development
 
 Static checks:
@@ -248,5 +269,6 @@ Implement the `PlaybackBackend` protocol in [`src/wai_music/backends/base.py`](s
 
 - verify and expand curated MBIDs in `must_hear.json`
 - add richer MusicBrainz relation traversal for releases and works
+- implement ListenBrainz, Last.fm, and Discogs adapters behind explicit configuration
 - add Apple Music / Deezer / Tidal / Yandex backends
 - extend curated scene metadata and anniversary indexing

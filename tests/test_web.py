@@ -218,7 +218,10 @@ def test_find_page_disconnected_state_and_generated_prompt(tmp_path: Path) -> No
         page = client.get("/find")
         assert page.status_code == 200
         assert "Connect Spotify to use your listening profile" in page.text
-        assert "Use this with Claude after connecting wai-music" in page.text
+        assert "Source intelligence" in page.text
+        assert "MusicBrainz" in page.text
+        assert "ListenBrainz" in page.text
+        assert "MCP workflow" in page.text
 
         generated = client.post(
             "/find",
@@ -237,6 +240,7 @@ def test_find_page_disconnected_state_and_generated_prompt(tmp_path: Path) -> No
     assert generated.status_code == 200
     assert "late night jazz" in generated.text
     assert "intent: playlist" in generated.text
+    assert "planned, do not claim live access" in generated.text
     assert "data-copy=" in generated.text
     assert "Use as seed" in generated.text
 

@@ -20,7 +20,10 @@ from wai_music.auth.oauth import WaiOAuthProvider
 from wai_music.auth.spotify import build_authorize_url, current_user_profile, exchange_code
 from wai_music.auth.store import SessionRecord
 from wai_music.models import (
+    CatalogSignal,
     DiscoveryDepth,
+    DiscoveryWorkflowStep,
+    MusicDiscoveryPlan,
     MusicFinderChoices,
     MusicFinderIntent,
     MusicFinderResult,
@@ -28,7 +31,7 @@ from wai_music.models import (
 )
 from wai_music.services import ServiceContainer
 from wai_music.settings import WaiMusicSettings
-from wai_music.tools.finder import find_music_for_choices
+from wai_music.tools.workflow import build_music_discovery_plan
 
 APP_CSS = """
 * {
@@ -324,49 +327,133 @@ ol {
   gap: 20px;
   margin-bottom: 14px;
 }
+.source-strip {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.58);
+  padding: 14px 16px;
+  margin-bottom: 8px;
+}
+.source-strip-head,
+.workflow-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.source-strip h3,
+.workflow-panel h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.source-strip p,
+.workflow-panel p {
+  margin: 0;
+  font-size: 13px;
+}
+.source-marker {
+  display: inline-flex;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #d99a32;
+  margin-top: 2px;
+}
+.source-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.source-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 32px;
+  max-width: 230px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 253, 248, 0.82);
+  padding: 7px 9px;
+  font-size: 13px;
+}
+.source-pill span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.source-pill strong {
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 760;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.source-active {
+  border-color: rgba(6, 75, 71, 0.4);
+}
+.source-active strong {
+  color: var(--teal-dark);
+}
+.source-planned {
+  background: rgba(245, 241, 233, 0.68);
+}
 .recommendation {
   display: grid;
-  grid-template-columns: 128px minmax(0, 1fr) 150px 210px;
-  gap: 24px;
+  grid-template-columns: 48px minmax(0, 1.3fr) minmax(140px, 0.55fr) 176px;
+  gap: 18px;
   align-items: center;
   border-top: 1px solid var(--line);
   padding: 14px 0;
 }
 .cover-tile {
-  aspect-ratio: 1;
-  border-radius: var(--radius);
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
   border: 1px solid rgba(23, 19, 15, 0.08);
   background:
-    linear-gradient(135deg, rgba(6, 75, 71, 0.8), transparent 52%),
-    linear-gradient(45deg, rgba(166, 106, 16, 0.38), transparent 55%),
-    linear-gradient(180deg, #29302b, #ede0ca);
+    linear-gradient(135deg, rgba(6, 75, 71, 0.1), rgba(6, 75, 71, 0.22)),
+    var(--surface-strong);
+  position: relative;
+}
+.cover-tile::after {
+  content: "";
+  position: absolute;
+  left: 15px;
+  top: 11px;
+  border-left: 11px solid var(--nav);
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
 }
 .cover-tile.alt-1 {
   background:
-    linear-gradient(150deg, rgba(21, 35, 42, 0.92), transparent 55%),
-    linear-gradient(70deg, rgba(255, 253, 248, 0.72), transparent 48%),
-    #778982;
+    linear-gradient(135deg, rgba(166, 106, 16, 0.1), rgba(166, 106, 16, 0.2)),
+    var(--surface-strong);
 }
 .cover-tile.alt-2 {
   background:
-    linear-gradient(130deg, rgba(25, 77, 55, 0.92), transparent 50%),
-    linear-gradient(20deg, rgba(166, 106, 16, 0.42), transparent 56%),
-    #d7c7ad;
+    linear-gradient(135deg, rgba(21, 35, 42, 0.08), rgba(21, 35, 42, 0.18)),
+    var(--surface-strong);
 }
 .rank {
-  font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
   color: var(--amber);
-  font-size: 32px;
-  margin-right: 12px;
+  font: 760 13px/1 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin-right: 8px;
 }
 .rec-title {
   display: flex;
   align-items: baseline;
-  gap: 4px;
+  gap: 2px;
   font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
-  font-size: 24px;
-  line-height: 1.05;
-  margin-bottom: 8px;
+  font-size: 20px;
+  line-height: 1.08;
+  margin-bottom: 6px;
 }
 .rec-detail p {
   margin-bottom: 8px;
@@ -412,6 +499,64 @@ ol {
   padding: 18px 28px;
   background: rgba(255, 253, 248, 0.86);
 }
+.workflow-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.85fr);
+  gap: 18px;
+  border: 1px solid var(--line);
+  border-top: 0;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: 18px 28px 24px;
+  background: rgba(255, 253, 248, 0.92);
+}
+.workflow-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.workflow-step {
+  display: grid;
+  align-content: space-between;
+  min-height: 112px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.62);
+  padding: 12px;
+}
+.workflow-step strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+.workflow-step p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.38;
+}
+.workflow-step span {
+  justify-self: start;
+  max-width: 100%;
+  border-radius: 5px;
+  background: rgba(23, 19, 15, 0.06);
+  color: var(--ink);
+  padding: 5px 7px;
+  font: 12px/1.25 "SFMono-Regular", "Menlo", "Monaco", monospace;
+  overflow-wrap: anywhere;
+}
+.step-requires_connection {
+  opacity: 0.78;
+}
+.prompt-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.prompt-title .ghost {
+  min-height: 32px;
+  padding: 6px 10px;
+}
 .status-dot {
   display: inline-flex;
   width: 9px;
@@ -429,6 +574,12 @@ ol {
   margin-top: 10px;
   max-height: 76px;
   overflow: auto;
+}
+.prompt-box-large {
+  max-height: 184px;
+  color: #f5efe5;
+  background: #14161a;
+  border-color: rgba(255, 253, 248, 0.12);
 }
 .dashboard-title {
   margin: 26px 0 0;
@@ -449,7 +600,12 @@ ol {
     padding: 22px 18px 56px;
   }
   .finder-layout,
-  .status-strip {
+  .status-strip,
+  .source-strip,
+  .workflow-panel {
+    grid-template-columns: 1fr;
+  }
+  .workflow-steps {
     grid-template-columns: 1fr;
   }
   .choice-panel form {
@@ -665,16 +821,17 @@ def build_web_routes(
                 error = str(exc)
         else:
             choices = _default_finder_choices()
-        result = await find_music_for_choices(
+        plan = await build_music_discovery_plan(
             choices,
             services=services,
             limit=3,
             language=settings.default_language,
+            spotify_connected=spotify is not None,
         )
         return HTMLResponse(
             _finder_page(
                 session,
-                result,
+                plan,
                 services=services,
                 settings=settings,
                 error=error,
@@ -1071,13 +1228,14 @@ def _dashboard_page(
 
 def _finder_page(
     session: SessionRecord,
-    result: MusicFinderResult,
+    plan: MusicDiscoveryPlan,
     *,
     services: ServiceContainer,
     settings: WaiMusicSettings,
     submitted: bool,
     error: str | None = None,
 ) -> str:
+    result = plan.result
     spotify = services.auth_store.get_spotify_connection(session.user_id)
     mcp_url = _mcp_url(settings)
     spotify_state = (
@@ -1109,7 +1267,8 @@ def _finder_page(
           </div>
           <a class="button ghost" href="/dashboard">Dashboard</a>
         </div>
-        {_recommendations_markup(result)}
+        {_source_intelligence_markup(plan.catalogs)}
+        {_recommendations_markup(result, workflow_prompt=plan.mcp_prompt)}
       </section>
     </section>
     <section class="status-strip" aria-label="MCP status">
@@ -1122,10 +1281,11 @@ def _finder_page(
         <p>{spotify_state}</p>
       </div>
       <div>
-        <h3>Use this with Claude after connecting wai-music</h3>
-        <div class="prompt-box mono">{escape(result.mcp_prompt)}</div>
+        <h3>Source coverage</h3>
+        <p>{_catalog_summary_markup(plan.catalogs)}</p>
       </div>
     </section>
+    {_workflow_panel_markup(plan)}
     <h2 class="dashboard-title">Your dashboard continues below</h2>
     <section class="grid">
       <article class="card">
@@ -1217,7 +1377,91 @@ def _finder_form(choices: MusicFinderChoices, *, spotify_connected: bool) -> str
     """
 
 
-def _recommendations_markup(result: MusicFinderResult) -> str:
+def _source_intelligence_markup(catalogs: list[CatalogSignal]) -> str:
+    visible = catalogs[:7]
+    return f"""
+    <section class="source-strip" aria-label="Source intelligence">
+      <div class="source-strip-head">
+        <span class="source-marker" aria-hidden="true"></span>
+        <div>
+          <h3>Source intelligence</h3>
+          <p>{escape(str(len([catalog for catalog in catalogs if catalog.status == "active"])))} active catalogs</p>
+        </div>
+      </div>
+      <div class="source-list">
+        {"".join(_catalog_pill_markup(catalog) for catalog in visible)}
+      </div>
+    </section>
+    """
+
+
+def _catalog_pill_markup(catalog: CatalogSignal) -> str:
+    return f"""
+    <div class="source-pill source-{escape(catalog.status)}">
+      <span>{escape(catalog.name)}</span>
+      <strong>{escape(_catalog_status_label(catalog.status))}</strong>
+    </div>
+    """
+
+
+def _catalog_summary_markup(catalogs: list[CatalogSignal]) -> str:
+    active = [catalog.name for catalog in catalogs if catalog.status == "active"]
+    planned = [catalog.name for catalog in catalogs if catalog.status == "planned"]
+    parts = [f"{len(active)} active"]
+    if planned:
+        parts.append(f"{len(planned)} planned")
+    return escape(" · ".join(parts))
+
+
+def _workflow_panel_markup(plan: MusicDiscoveryPlan) -> str:
+    return f"""
+    <section class="workflow-panel" aria-label="MCP workflow">
+      <div>
+        <div class="workflow-heading">
+          <span class="source-marker" aria-hidden="true"></span>
+          <div>
+            <h3>MCP workflow</h3>
+            <p>Source-aware plan for Claude and other MCP clients.</p>
+          </div>
+        </div>
+        <div class="workflow-steps">
+          {"".join(_workflow_step_markup(step) for step in plan.workflow_steps[:6])}
+        </div>
+      </div>
+      <div>
+        <div class="prompt-title">
+          <h3>Prompt</h3>
+          <button class="ghost" type="button" data-copy="{escape(plan.mcp_prompt)}">Copy</button>
+        </div>
+        <div class="prompt-box mono prompt-box-large">{escape(plan.mcp_prompt)}</div>
+      </div>
+    </section>
+    """
+
+
+def _workflow_step_markup(step: DiscoveryWorkflowStep) -> str:
+    tool_label = ", ".join(step.tool_names)
+    return f"""
+    <div class="workflow-step step-{escape(step.status)}">
+      <div>
+        <strong>{escape(step.label)}</strong>
+        <p>{escape(step.reason)}</p>
+      </div>
+      <span>{escape(tool_label)}</span>
+    </div>
+    """
+
+
+def _catalog_status_label(status: str) -> str:
+    labels = {
+        "active": "active",
+        "available": "ready",
+        "planned": "planned",
+    }
+    return labels.get(status, status)
+
+
+def _recommendations_markup(result: MusicFinderResult, *, workflow_prompt: str) -> str:
     if not result.candidates:
         return '<p class="muted">No recommendations matched these choices.</p>'
     rows = []
@@ -1232,7 +1476,7 @@ def _recommendations_markup(result: MusicFinderResult) -> str:
             part for part in [artist, str(year) if year is not None else None] if part
         )
         spotify_query = candidate.spotify_query or candidate.entity.name
-        copy_prompt = _candidate_prompt(result, spotify_query)
+        copy_prompt = _candidate_prompt(result, spotify_query, workflow_prompt=workflow_prompt)
         rows.append(
             f"""
             <article class="recommendation">
@@ -1278,13 +1522,13 @@ def _display_tags(result: MusicFinderResult, genre: str, year: int | None) -> li
     return deduped[:4]
 
 
-def _candidate_prompt(result: MusicFinderResult, seed: str) -> str:
+def _candidate_prompt(result: MusicFinderResult, seed: str, *, workflow_prompt: str) -> str:
     choices = result.choices.model_copy(update={"query": seed, "source": "manual_seed"})
     return "\n".join(
         [
             "Use the wai-music MCP tools to refine this recommendation.",
             f"seed: {seed}",
-            result.mcp_prompt,
+            workflow_prompt,
             f"next_source: {choices.source}",
         ]
     )
