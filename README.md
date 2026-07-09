@@ -89,6 +89,9 @@ WAI_MUSIC_PORT=8765
 WAI_MUSIC_PUBLIC_BASE_URL=
 WAI_MUSIC_SECRET_KEY=
 WAI_MUSIC_ENABLE_PERSONAL_ACCESS_TOKENS=false
+WAI_MUSIC_MAGIC_LINK_FROM_EMAIL=
+WAI_MUSIC_MAGIC_LINK_TTL_SECONDS=900
+RESEND_API_KEY=
 
 MUSICBRAINZ_USER_AGENT=wai-music/0.1 (+https://github.com/mikwiseman/wai-music)
 ```
@@ -116,13 +119,15 @@ For hosted multi-user mode, set:
 ```dotenv
 WAI_MUSIC_PUBLIC_BASE_URL=https://music.waiwai.is
 WAI_MUSIC_SECRET_KEY=...
+RESEND_API_KEY=...
+WAI_MUSIC_MAGIC_LINK_FROM_EMAIL=login@music.waiwai.is
 ```
 
 and register this Spotify redirect URI:
 
 `https://music.waiwai.is/auth/spotify/callback`
 
-In hosted mode, users connect Spotify through the web UI and receive user-scoped MCP access through OAuth.
+In hosted mode, users sign in through short-lived email magic links, connect Spotify through the web UI, and receive user-scoped MCP access through OAuth.
 
 ## Claude Code / MCP Setup
 
@@ -152,7 +157,7 @@ Then point the client to `http://127.0.0.1:8765/mcp`.
 
 `wai-music` can now run as a hosted multi-user service:
 
-- browser auth and dashboard
+- browser magic-link auth and dashboard
 - per-user Spotify connections
 - protected MCP endpoint with OAuth
 - user-scoped playlist history and notes
@@ -167,7 +172,7 @@ For the normal `claude.ai` flow, users do not need a manually generated API key.
 
 Recommended flow:
 
-1. The user creates a `wai-music` account and signs in on the hosted web UI.
+1. The user enters their email and opens the magic link from `wai-music`.
 2. The user connects Spotify in the dashboard.
 3. In Claude, the user adds a custom connector pointing to `https://music.waiwai.is/mcp`.
 4. Leave Claude's advanced OAuth client settings empty unless you intentionally manage client credentials yourself.

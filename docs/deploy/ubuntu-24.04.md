@@ -32,11 +32,14 @@ Edit `/etc/wai-music/music.env` and set:
 - `SPOTIFY_CLIENT_ID`
 - `SPOTIFY_CLIENT_SECRET`
 - `WAI_MUSIC_SECRET_KEY`
+- `RESEND_API_KEY`
+- `WAI_MUSIC_MAGIC_LINK_FROM_EMAIL`
 
 Recommended for the first public beta:
 
 - keep `WAI_MUSIC_ENABLE_PERSONAL_ACCESS_TOKENS=false`
-- use the default sign-up/sign-in rate limits unless you have a stronger edge rate limiter in front of the app
+- use the default magic-link sign-in rate limits unless you have a stronger edge rate limiter in front of the app
+- use a Resend API key scoped to sending and a verified sender domain
 
 ## 3. DNS and TLS
 

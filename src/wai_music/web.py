@@ -8,13 +8,14 @@ from datetime import UTC, datetime
 from html import escape
 from threading import Lock
 from typing import cast
-from urllib.parse import parse_qs, quote
+from urllib.parse import parse_qs, quote, urlencode
 
 from mcp.server.auth.provider import construct_redirect_uri
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.routing import BaseRoute, Route
 
+from wai_music.auth.magic_email import EmailDeliveryError
 from wai_music.auth.oauth import WaiOAuthProvider
 from wai_music.auth.spotify import build_authorize_url, current_user_profile, exchange_code
 from wai_music.auth.store import SessionRecord
@@ -111,6 +112,10 @@ a {
   justify-content: flex-end;
   align-items: center;
   gap: 10px;
+}
+.top-actions form {
+  display: block;
+  margin: 0;
 }
 .shell {
   width: min(1440px, 100%);
@@ -477,6 +482,14 @@ ol {
 }
 """
 
+AUTH_PAGE_TITLES = {
+    "Create account",
+    "Sign in",
+    "Check your email",
+    "Continue sign-in",
+    "Magic link expired",
+}
+
 
 def build_web_routes(
     services: ServiceContainer,
@@ -518,48 +531,9 @@ def build_web_routes(
         """
         return HTMLResponse(_page("wai-music", body))
 
-    async def sign_up(request: Request) -> Response:
+    async def _request_magic_link(request: Request, *, title: str, action: str) -> Response:
         if request.method == "GET":
-            return HTMLResponse(
-                _auth_form("Create account", "/sign-up", next_path=_safe_next(request))
-            )
-        sign_up_limited = _rate_limit_response(
-            request=request,
-            limiter=rate_limiter,
-            bucket=f"signup:{_request_identity(request)}",
-            window_seconds=settings.signup_rate_limit_window_seconds,
-            max_attempts=settings.signup_rate_limit_max_attempts,
-        )
-        if sign_up_limited is not None:
-            return sign_up_limited
-        form = await _parse_form(request)
-        next_path = _safe_next(request, form.get("next"))
-        try:
-            user = services.auth_store.create_user(
-                email=form.get("email", ""),
-                password=form.get("password", ""),
-            )
-        except ValueError as exc:
-            return HTMLResponse(
-                _auth_form(
-                    "Create account",
-                    "/sign-up",
-                    error=str(exc),
-                    next_path=next_path,
-                    email=form.get("email", ""),
-                ),
-                status_code=400,
-            )
-        return _session_redirect(
-            user.user_id,
-            next_path,
-            services=services,
-            settings=settings,
-        )
-
-    async def sign_in(request: Request) -> Response:
-        if request.method == "GET":
-            return HTMLResponse(_auth_form("Sign in", "/sign-in", next_path=_safe_next(request)))
+            return HTMLResponse(_auth_form(title, action, next_path=_safe_next(request)))
         sign_in_limited = _rate_limit_response(
             request=request,
             limiter=rate_limiter,
@@ -571,24 +545,86 @@ def build_web_routes(
             return sign_in_limited
         form = await _parse_form(request)
         next_path = _safe_next(request, form.get("next"))
-        user = services.auth_store.authenticate_user(
-            email=form.get("email", ""),
-            password=form.get("password", ""),
-        )
-        if user is None:
+        email = form.get("email", "")
+        if email.strip():
+            email_limited = _rate_limit_response(
+                request=request,
+                limiter=rate_limiter,
+                bucket=f"signin-email:{email.strip().lower()}",
+                window_seconds=settings.signin_rate_limit_window_seconds,
+                max_attempts=settings.signin_rate_limit_max_attempts,
+            )
+            if email_limited is not None:
+                return email_limited
+        try:
+            magic_link_record, raw_token = services.auth_store.issue_magic_link(
+                email=email,
+                next_path=next_path,
+                ttl_seconds=settings.magic_link_ttl_seconds,
+            )
+        except ValueError as exc:
             return HTMLResponse(
                 _auth_form(
-                    "Sign in",
-                    "/sign-in",
-                    error="Invalid email or password.",
+                    title,
+                    action,
+                    error=str(exc),
                     next_path=next_path,
-                    email=form.get("email", ""),
+                    email=email,
                 ),
-                status_code=401,
+                status_code=400,
             )
+
+        try:
+            services.magic_link_email_sender.send_magic_link(
+                recipient_email=magic_link_record.email,
+                magic_link=_magic_link_url(request, settings=settings, raw_token=raw_token),
+                expires_in_minutes=_ttl_minutes(settings.magic_link_ttl_seconds),
+            )
+        except EmailDeliveryError as exc:
+            services.auth_store.delete_magic_link(raw_token)
+            return HTMLResponse(
+                _auth_form(
+                    title,
+                    action,
+                    error=str(exc),
+                    next_path=next_path,
+                    email=email,
+                ),
+                status_code=500,
+            )
+        return HTMLResponse(
+            _magic_link_requested_page(
+                email=magic_link_record.email,
+                expires_in_minutes=_ttl_minutes(settings.magic_link_ttl_seconds),
+            )
+        )
+
+    async def sign_up(request: Request) -> Response:
+        return await _request_magic_link(request, title="Create account", action="/sign-up")
+
+    async def sign_in(request: Request) -> Response:
+        return await _request_magic_link(request, title="Sign in", action="/sign-in")
+
+    async def magic_link(request: Request) -> Response:
+        if request.method == "GET":
+            raw_token = request.query_params.get("token", "")
+            magic_link_record = services.auth_store.get_magic_link(raw_token) if raw_token else None
+            if magic_link_record is None:
+                return _invalid_magic_link_response()
+            return HTMLResponse(
+                _magic_link_continue_page(
+                    token=raw_token,
+                    email=magic_link_record.email,
+                    expires_at=magic_link_record.expires_at,
+                )
+            )
+        form = await _parse_form(request)
+        consumed = services.auth_store.consume_magic_link(form.get("token", ""))
+        if consumed is None:
+            return _invalid_magic_link_response()
         return _session_redirect(
-            user.user_id,
-            next_path,
+            consumed.user.user_id,
+            consumed.next_path,
             services=services,
             settings=settings,
         )
@@ -846,7 +882,7 @@ def build_web_routes(
               </form>
             </section>
             """
-            return HTMLResponse(_page("Approve MCP access", body))
+            return HTMLResponse(_page("Approve MCP access", body, authenticated=True))
         code = oauth_provider.approve_request(request_id=request_id, user_id=session.user_id)
         return RedirectResponse(
             construct_redirect_uri(
@@ -872,6 +908,7 @@ def build_web_routes(
         Route("/", endpoint=landing, methods=["GET"]),
         Route("/sign-up", endpoint=sign_up, methods=["GET", "POST"]),
         Route("/sign-in", endpoint=sign_in, methods=["GET", "POST"]),
+        Route("/auth/magic-link", endpoint=magic_link, methods=["GET", "POST"]),
         Route("/logout", endpoint=logout, methods=["POST"]),
         Route("/dashboard", endpoint=dashboard, methods=["GET"]),
         Route("/find", endpoint=music_finder, methods=["GET", "POST"]),
@@ -1028,6 +1065,7 @@ def _dashboard_page(
           </article>
         </section>
         """,
+        authenticated=True,
     )
 
 
@@ -1104,7 +1142,7 @@ def _finder_page(
       </article>
     </section>
     """
-    return _page("Find music", body)
+    return _page("Find music", body, authenticated=True)
 
 
 def _finder_form(choices: MusicFinderChoices, *, spotify_connected: bool) -> str:
@@ -1516,6 +1554,78 @@ def _session_redirect(
     return response
 
 
+def _magic_link_url(
+    request: Request,
+    *,
+    settings: WaiMusicSettings,
+    raw_token: str,
+) -> str:
+    base_url = (
+        settings.public_base_url.rstrip("/")
+        if settings.public_base_url
+        else str(request.base_url).rstrip("/")
+    )
+    return f"{base_url}/auth/magic-link?{urlencode({'token': raw_token})}"
+
+
+def _ttl_minutes(ttl_seconds: int) -> int:
+    return max(1, round(ttl_seconds / 60))
+
+
+def _magic_link_requested_page(*, email: str, expires_in_minutes: int) -> str:
+    body = f"""
+    <section class="hero">
+      <h1>Check your email</h1>
+      <p>
+        We sent a sign-in link to <strong>{escape(email)}</strong>. Open it on this device
+        and continue within {expires_in_minutes} minutes.
+      </p>
+      <div class="actions">
+        <a class="button secondary" href="/sign-in">Use a different email</a>
+      </div>
+    </section>
+    """
+    return _page("Check your email", body)
+
+
+def _magic_link_continue_page(*, token: str, email: str, expires_at: int) -> str:
+    body = f"""
+    <section class="hero">
+      <h1>Continue sign-in</h1>
+      <p>
+        Continue to wai-music as <strong>{escape(email)}</strong>. This one-time link expires at
+        {escape(_format_unix_ts(expires_at))}.
+      </p>
+      <form method="post" action="/auth/magic-link">
+        <input type="hidden" name="token" value="{escape(token)}" />
+        <div class="actions">
+          <button type="submit">Continue</button>
+          <a class="button secondary" href="/sign-in">Cancel</a>
+        </div>
+      </form>
+    </section>
+    """
+    return _page("Continue sign-in", body)
+
+
+def _invalid_magic_link_response() -> HTMLResponse:
+    return HTMLResponse(
+        _page(
+            "Magic link expired",
+            """
+            <section class="hero">
+              <h1>Magic link expired</h1>
+              <p>This sign-in link is expired or has already been used.</p>
+              <div class="actions">
+                <a class="button" href="/sign-in">Request a new link</a>
+              </div>
+            </section>
+            """,
+        ),
+        status_code=400,
+    )
+
+
 def _auth_form(
     title: str,
     action: str,
@@ -1529,8 +1639,8 @@ def _auth_form(
     <section class="hero">
       <h1>{escape(title)}</h1>
       <p>
-        Hosted wai-music uses a separate account layer so Spotify tokens, playlists, and notes stay
-        scoped to the person who authorized them.
+        Enter your email and wai-music will send a secure sign-in link. Spotify tokens,
+        playlists, and notes stay scoped to the person who opened the link.
       </p>
     </section>
     <section class="card" style="margin-top: 18px;">
@@ -1540,11 +1650,8 @@ def _auth_form(
         <label>Email
           <input type="email" name="email" value="{escape(email)}" autocomplete="email" required />
         </label>
-        <label>Password
-          <input type="password" name="password" autocomplete="new-password" required />
-        </label>
         <div class="actions">
-          <button type="submit">{escape(title)}</button>
+          <button type="submit">Send sign-in link</button>
           <a class="button secondary" href="/">Back</a>
         </div>
       </form>
@@ -1553,9 +1660,21 @@ def _auth_form(
     return _page(title, body)
 
 
-def _page(title: str, body: str) -> str:
+def _page(title: str, body: str, *, authenticated: bool = False) -> str:
     discover_current = ' aria-current="page"' if title in {"wai-music", "Find music"} else ""
     dashboard_current = ' aria-current="page"' if title == "Dashboard" else ""
+    if title in AUTH_PAGE_TITLES:
+        top_actions = ""
+    elif authenticated:
+        top_actions = """
+        <form method="post" action="/logout"><button class="secondary" type="submit">Sign out</button></form>
+        <a class="button" href="/spotify/connect">Connect Spotify</a>
+        """
+    else:
+        top_actions = """
+        <a class="button secondary" href="/sign-in">Sign in</a>
+        <a class="button" href="/spotify/connect">Connect Spotify</a>
+        """
     return f"""<!doctype html>
 <html lang="en">
   <head>
@@ -1574,8 +1693,7 @@ def _page(title: str, body: str) -> str:
         <a href="/dashboard">MCP</a>
       </nav>
       <div class="top-actions">
-        <a class="button secondary" href="/sign-in">Sign in</a>
-        <a class="button" href="/spotify/connect">Connect Spotify</a>
+        {top_actions}
       </div>
     </header>
     <main class="shell">

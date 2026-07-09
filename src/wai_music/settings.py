@@ -90,6 +90,15 @@ class WaiMusicSettings(BaseSettings):
         default=10,
         alias="WAI_MUSIC_SIGNIN_RATE_LIMIT_MAX_ATTEMPTS",
     )
+    resend_api_key: str | None = Field(default=None, alias="RESEND_API_KEY")
+    magic_link_from_email: str | None = Field(
+        default=None,
+        alias="WAI_MUSIC_MAGIC_LINK_FROM_EMAIL",
+    )
+    magic_link_ttl_seconds: int = Field(
+        default=60 * 15,
+        alias="WAI_MUSIC_MAGIC_LINK_TTL_SECONDS",
+    )
     personal_access_token_rate_limit_window_seconds: int = Field(
         default=60 * 60,
         alias="WAI_MUSIC_PERSONAL_ACCESS_TOKEN_RATE_LIMIT_WINDOW_SECONDS",

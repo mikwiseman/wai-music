@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from inspect import isawaitable
 
 from wai_music.aggregator import EntityAggregator
+from wai_music.auth.magic_email import MagicLinkEmailSender, ResendMagicLinkEmailSender
 from wai_music.auth.store import SQLiteAuthStore
 from wai_music.backends.base import BackendRegistry
 from wai_music.backends.spotify import SpotifyBackend
@@ -24,6 +25,7 @@ class ServiceContainer:
     wikipedia: WikipediaSource
     aggregator: EntityAggregator
     backends: BackendRegistry
+    magic_link_email_sender: MagicLinkEmailSender
     _closed: bool = field(default=False, init=False, repr=False)
 
     async def close(self) -> None:
@@ -60,6 +62,10 @@ def create_services(settings: WaiMusicSettings | None = None) -> ServiceContaine
     aggregator = EntityAggregator(musicbrainz, wikipedia)
     backends = BackendRegistry()
     backends.register(SpotifyBackend(configured, auth_store=auth_store))
+    magic_link_email_sender = ResendMagicLinkEmailSender(
+        api_key=configured.resend_api_key,
+        from_email=configured.magic_link_from_email,
+    )
     return ServiceContainer(
         settings=configured,
         cache=cache,
@@ -68,4 +74,5 @@ def create_services(settings: WaiMusicSettings | None = None) -> ServiceContaine
         wikipedia=wikipedia,
         aggregator=aggregator,
         backends=backends,
+        magic_link_email_sender=magic_link_email_sender,
     )

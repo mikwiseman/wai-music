@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 from mcp.server.auth.provider import AuthorizationParams
 from mcp.shared.auth import OAuthClientInformationFull
@@ -10,6 +11,26 @@ from starlette.testclient import TestClient
 from wai_music.server import build_web_app
 from wai_music.services import create_services
 from wai_music.settings import WaiMusicSettings
+
+
+class FakeMagicLinkEmailSender:
+    def __init__(self) -> None:
+        self.sent: list[dict[str, object]] = []
+
+    def send_magic_link(
+        self,
+        *,
+        recipient_email: str,
+        magic_link: str,
+        expires_in_minutes: int,
+    ) -> None:
+        self.sent.append(
+            {
+                "recipient_email": recipient_email,
+                "magic_link": magic_link,
+                "expires_in_minutes": expires_in_minutes,
+            }
+        )
 
 
 def _hosted_settings(tmp_path: Path) -> WaiMusicSettings:
@@ -29,9 +50,43 @@ def _hosted_settings_with_pats(tmp_path: Path) -> WaiMusicSettings:
     return settings.model_copy(update={"enable_personal_access_tokens": True})
 
 
+def _sign_in_with_magic_link(
+    client: TestClient,
+    sender: FakeMagicLinkEmailSender,
+    *,
+    email: str = "user@example.com",
+    next_path: str = "/dashboard",
+) -> None:
+    sent_count = len(sender.sent)
+    request_link = client.post(
+        "/sign-in",
+        data={"email": email, "next": next_path},
+    )
+    assert request_link.status_code == 200
+    assert "Check your email" in request_link.text
+    assert len(sender.sent) == sent_count + 1
+
+    magic_link = str(sender.sent[-1]["magic_link"])
+    parsed = urlparse(magic_link)
+    preview = client.get(f"{parsed.path}?{parsed.query}")
+    assert preview.status_code == 200
+    assert "Continue sign-in" in preview.text
+    token = parse_qs(parsed.query)["token"][0]
+
+    callback = client.post(
+        parsed.path,
+        data={"token": token},
+        follow_redirects=False,
+    )
+    assert callback.status_code == 303
+    assert callback.headers["location"] == next_path
+
+
 def test_hosted_web_dashboard_and_healthz(tmp_path: Path) -> None:
     settings = _hosted_settings(tmp_path)
     services = create_services(settings)
+    fake_sender = FakeMagicLinkEmailSender()
+    services.magic_link_email_sender = fake_sender
     app = build_web_app(services, settings=settings)
 
     with TestClient(app) as client:
@@ -39,12 +94,7 @@ def test_hosted_web_dashboard_and_healthz(tmp_path: Path) -> None:
         assert response.status_code == 200
         assert response.json()["oauth_enabled"] is True
 
-        sign_up = client.post(
-            "/sign-up",
-            data={"email": "user@example.com", "password": "correct horse battery staple"},
-            follow_redirects=False,
-        )
-        assert sign_up.status_code == 303
+        _sign_in_with_magic_link(client, fake_sender)
         dashboard = client.get("/dashboard")
         assert dashboard.status_code == 200
         assert "user@example.com" in dashboard.text
@@ -52,6 +102,95 @@ def test_hosted_web_dashboard_and_healthz(tmp_path: Path) -> None:
         assert "No API key or manual token is required" in dashboard.text
         assert "Find music" in dashboard.text
         assert "Generate token" not in dashboard.text
+
+
+def test_sign_in_sends_magic_link_and_callback_sets_session(tmp_path: Path) -> None:
+    settings = _hosted_settings(tmp_path)
+    services = create_services(settings)
+    fake_sender = FakeMagicLinkEmailSender()
+    services.magic_link_email_sender = fake_sender
+    app = build_web_app(services, settings=settings)
+
+    with TestClient(app) as client:
+        request_link = client.post(
+            "/sign-in",
+            data={"email": " User@Example.COM ", "next": "/find"},
+        )
+        assert request_link.status_code == 200
+        assert "Check your email" in request_link.text
+        assert len(fake_sender.sent) == 1
+        assert fake_sender.sent[0]["recipient_email"] == "user@example.com"
+
+        magic_link = str(fake_sender.sent[0]["magic_link"])
+        parsed = urlparse(magic_link)
+        preview = client.get(f"{parsed.path}?{parsed.query}")
+        assert preview.status_code == 200
+        assert "Continue sign-in" in preview.text
+        token = parse_qs(parsed.query)["token"][0]
+        callback = client.post(
+            parsed.path,
+            data={"token": token},
+            follow_redirects=False,
+        )
+        assert callback.status_code == 303
+        assert callback.headers["location"] == "/find"
+
+        dashboard = client.get("/dashboard")
+        assert dashboard.status_code == 200
+        assert "user@example.com" in dashboard.text
+
+
+def test_magic_link_callback_rejects_reuse(tmp_path: Path) -> None:
+    settings = _hosted_settings(tmp_path)
+    services = create_services(settings)
+    fake_sender = FakeMagicLinkEmailSender()
+    services.magic_link_email_sender = fake_sender
+    app = build_web_app(services, settings=settings)
+
+    with TestClient(app) as client:
+        request_link = client.post("/sign-in", data={"email": "user@example.com"})
+        assert request_link.status_code == 200
+
+        magic_link = str(fake_sender.sent[0]["magic_link"])
+        parsed = urlparse(magic_link)
+        callback_path = f"{parsed.path}?{parsed.query}"
+        token = parse_qs(parsed.query)["token"][0]
+        assert client.get(callback_path).status_code == 200
+        assert (
+            client.post(parsed.path, data={"token": token}, follow_redirects=False).status_code
+            == 303
+        )
+        reused = client.get(callback_path)
+
+    assert reused.status_code == 400
+    assert "expired or has already been used" in reused.text
+
+
+def test_magic_link_rejects_external_next_path(tmp_path: Path) -> None:
+    settings = _hosted_settings(tmp_path)
+    services = create_services(settings)
+    fake_sender = FakeMagicLinkEmailSender()
+    services.magic_link_email_sender = fake_sender
+    app = build_web_app(services, settings=settings)
+
+    with TestClient(app) as client:
+        request_link = client.post(
+            "/sign-in",
+            data={"email": "user@example.com", "next": "https://evil.example/path"},
+        )
+        assert request_link.status_code == 200
+
+        magic_link = str(fake_sender.sent[0]["magic_link"])
+        parsed = urlparse(magic_link)
+        token = parse_qs(parsed.query)["token"][0]
+        callback = client.post(
+            parsed.path,
+            data={"token": token},
+            follow_redirects=False,
+        )
+
+    assert callback.status_code == 303
+    assert callback.headers["location"] == "/dashboard"
 
 
 def test_find_route_requires_session(tmp_path: Path) -> None:
@@ -69,15 +208,12 @@ def test_find_route_requires_session(tmp_path: Path) -> None:
 def test_find_page_disconnected_state_and_generated_prompt(tmp_path: Path) -> None:
     settings = _hosted_settings(tmp_path)
     services = create_services(settings)
+    fake_sender = FakeMagicLinkEmailSender()
+    services.magic_link_email_sender = fake_sender
     app = build_web_app(services, settings=settings)
 
     with TestClient(app) as client:
-        sign_up = client.post(
-            "/sign-up",
-            data={"email": "user@example.com", "password": "correct horse battery staple"},
-            follow_redirects=False,
-        )
-        assert sign_up.status_code == 303
+        _sign_in_with_magic_link(client, fake_sender)
 
         page = client.get("/find")
         assert page.status_code == 200
@@ -136,15 +272,12 @@ def test_find_page_connected_state_mentions_spotify_profile(tmp_path: Path) -> N
 def test_personal_access_token_can_be_created_from_dashboard(tmp_path: Path) -> None:
     settings = _hosted_settings_with_pats(tmp_path)
     services = create_services(settings)
+    fake_sender = FakeMagicLinkEmailSender()
+    services.magic_link_email_sender = fake_sender
     app = build_web_app(services, settings=settings)
 
     with TestClient(app) as client:
-        sign_up = client.post(
-            "/sign-up",
-            data={"email": "user@example.com", "password": "correct horse battery staple"},
-            follow_redirects=False,
-        )
-        assert sign_up.status_code == 303
+        _sign_in_with_magic_link(client, fake_sender)
 
         created = client.post("/tokens/create", data={"label": "curl"})
         assert created.status_code == 200
@@ -155,15 +288,12 @@ def test_personal_access_token_can_be_created_from_dashboard(tmp_path: Path) -> 
 def test_personal_access_token_route_is_hidden_when_disabled(tmp_path: Path) -> None:
     settings = _hosted_settings(tmp_path)
     services = create_services(settings)
+    fake_sender = FakeMagicLinkEmailSender()
+    services.magic_link_email_sender = fake_sender
     app = build_web_app(services, settings=settings)
 
     with TestClient(app) as client:
-        sign_up = client.post(
-            "/sign-up",
-            data={"email": "user@example.com", "password": "correct horse battery staple"},
-            follow_redirects=False,
-        )
-        assert sign_up.status_code == 303
+        _sign_in_with_magic_link(client, fake_sender)
         response = client.post("/tokens/create", data={"label": "curl"})
         assert response.status_code == 404
 
@@ -176,18 +306,20 @@ def test_sign_in_is_rate_limited(tmp_path: Path) -> None:
         }
     )
     services = create_services(settings)
+    fake_sender = FakeMagicLinkEmailSender()
+    services.magic_link_email_sender = fake_sender
     app = build_web_app(services, settings=settings)
 
     with TestClient(app) as client:
         first = client.post(
             "/sign-in",
-            data={"email": "missing@example.com", "password": "wrong password"},
+            data={"email": "missing@example.com"},
         )
-        assert first.status_code == 401
+        assert first.status_code == 200
 
         second = client.post(
             "/sign-in",
-            data={"email": "missing@example.com", "password": "wrong password"},
+            data={"email": "missing@example.com"},
         )
         assert second.status_code == 429
 

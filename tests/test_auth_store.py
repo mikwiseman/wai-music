@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 from mcp.server.auth.provider import AuthorizationParams
 from mcp.shared.auth import OAuthClientInformationFull
 from pydantic import AnyHttpUrl
 
+from wai_music.auth.security import token_fingerprint
 from wai_music.auth.store import SQLiteAuthStore
 
 
@@ -25,6 +27,54 @@ def test_auth_store_round_trip(tmp_path: Path) -> None:
     )
     assert session is not None
     assert session.user_id == user.user_id
+
+
+def test_magic_link_tokens_are_single_use_and_create_users(tmp_path: Path) -> None:
+    store = SQLiteAuthStore(tmp_path / "auth.sqlite", secret_key="test-secret-key")
+
+    record, raw_token = store.issue_magic_link(
+        email=" Alice@Example.COM ",
+        next_path="/find",
+        ttl_seconds=900,
+    )
+    consumed = store.consume_magic_link(raw_token)
+
+    assert record.email == "alice@example.com"
+    assert record.next_path == "/find"
+    assert consumed is not None
+    assert consumed.user.email == "alice@example.com"
+    assert consumed.next_path == "/find"
+    assert store.consume_magic_link(raw_token) is None
+
+
+def test_magic_link_store_never_persists_raw_token(tmp_path: Path) -> None:
+    db_path = tmp_path / "auth.sqlite"
+    store = SQLiteAuthStore(db_path, secret_key="test-secret-key")
+
+    _record, raw_token = store.issue_magic_link(
+        email="alice@example.com",
+        next_path="/dashboard",
+        ttl_seconds=900,
+    )
+
+    with sqlite3.connect(db_path) as connection:
+        row = connection.execute("SELECT token_fingerprint FROM auth_magic_links").fetchone()
+
+    assert row is not None
+    assert row[0] == token_fingerprint(raw_token)
+    assert raw_token != row[0]
+
+
+def test_expired_magic_link_is_rejected(tmp_path: Path) -> None:
+    store = SQLiteAuthStore(tmp_path / "auth.sqlite", secret_key="test-secret-key")
+
+    _record, raw_token = store.issue_magic_link(
+        email="alice@example.com",
+        next_path="/dashboard",
+        ttl_seconds=-1,
+    )
+
+    assert store.consume_magic_link(raw_token) is None
 
 
 def test_auth_store_oauth_and_spotify_storage(tmp_path: Path) -> None:

@@ -7,7 +7,7 @@ This document describes the current user flow for the hosted `wai-music` service
 `wai-music` uses two separate auth layers:
 
 1. `wai-music` account auth
-   This is the web sign-up / sign-in session used for the dashboard and Spotify settings.
+   This is the web magic-link session used for the dashboard and Spotify settings.
 2. MCP OAuth for Claude
    This is the connector auth used when Claude connects to `https://music.waiwai.is/mcp`.
 
@@ -18,9 +18,9 @@ These layers are intentionally separate:
 
 ## What users do
 
-### 1. Create a `wai-music` account
+### 1. Sign in to `wai-music`
 
-Users open `https://music.waiwai.is`, choose `Create account`, and sign in.
+Users open `https://music.waiwai.is`, enter their email, and open the short-lived sign-in link sent by email. If it is their first successful sign-in, `wai-music` creates the account during link confirmation.
 
 ### 2. Connect Spotify
 
@@ -85,7 +85,7 @@ When Claude first reaches `https://music.waiwai.is/mcp`:
 2. Claude discovers the authorization server automatically
 3. Claude registers or identifies itself as an OAuth client
 4. Claude redirects the user to `wai-music`
-5. The user signs in to `wai-music` if needed
+5. The user signs in to `wai-music` with an email magic link if needed
 6. The user approves the OAuth request
 7. `wai-music` issues OAuth access and refresh tokens to Claude
 
@@ -106,17 +106,16 @@ Claude does not receive the Spotify client secret, and users never paste Spotify
 
 The current flow is suitable for a controlled rollout or early beta:
 
-- users can sign up
+- users can sign in with email magic links
 - users can connect Spotify
 - users can connect Claude through OAuth
 
 Before broad public launch, the next hardening steps should be:
 
-1. Add email verification
-2. Add password reset
-3. Add optional invite-only mode or admin approval
-4. Add monitoring and audit logging for auth and tool usage
-5. Decide whether personal access tokens should stay disabled for the public server
+1. Add optional invite-only mode or admin approval
+2. Add monitoring and audit logging for auth and tool usage
+3. Decide whether personal access tokens should stay disabled for the public server
+4. Add stronger distributed rate limiting if traffic grows beyond one app process
 
 ## Summary
 

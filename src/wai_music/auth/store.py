@@ -41,6 +41,21 @@ class SessionRecord:
 
 
 @dataclass(frozen=True)
+class MagicLinkRecord:
+    token_fingerprint: str
+    email: str
+    next_path: str
+    created_at: str
+    expires_at: int
+
+
+@dataclass(frozen=True)
+class ConsumedMagicLink:
+    user: UserRecord
+    next_path: str
+
+
+@dataclass(frozen=True)
 class SpotifyConnection:
     user_id: str
     spotify_user_id: str
@@ -104,6 +119,23 @@ class SQLiteAuthStore:
                     expires_at INTEGER NOT NULL,
                     FOREIGN KEY(user_id) REFERENCES auth_users(user_id)
                 )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS auth_magic_links (
+                    token_fingerprint TEXT PRIMARY KEY,
+                    email TEXT NOT NULL,
+                    next_path TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    expires_at INTEGER NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_auth_magic_links_expires_at
+                ON auth_magic_links(expires_at)
                 """
             )
             connection.execute(
@@ -189,9 +221,7 @@ class SQLiteAuthStore:
             )
 
     def create_user(self, *, email: str, password: str) -> UserRecord:
-        normalized_email = email.strip().lower()
-        if "@" not in normalized_email or " " in normalized_email:
-            raise ValueError("email must look like a valid address")
+        normalized_email = _normalize_email(email)
         if len(password) < 12:
             raise ValueError("password must be at least 12 characters long")
         user_id = new_opaque_token(bytes_length=16)
@@ -210,7 +240,10 @@ class SQLiteAuthStore:
         return UserRecord(user_id=user_id, email=normalized_email, created_at=created_at)
 
     def authenticate_user(self, *, email: str, password: str) -> UserRecord | None:
-        normalized_email = email.strip().lower()
+        try:
+            normalized_email = _normalize_email(email)
+        except ValueError:
+            return None
         with self._connect() as connection:
             row = connection.execute(
                 """
@@ -229,6 +262,143 @@ class SQLiteAuthStore:
             email=str(row["email"]),
             created_at=str(row["created_at"]),
         )
+
+    def get_or_create_user_by_email(self, email: str) -> UserRecord:
+        normalized_email = _normalize_email(email)
+        with self._connect() as connection:
+            return self._get_or_create_user_by_email(connection, normalized_email)
+
+    def issue_magic_link(
+        self,
+        *,
+        email: str,
+        next_path: str,
+        ttl_seconds: int,
+    ) -> tuple[MagicLinkRecord, str]:
+        normalized_email = _normalize_email(email)
+        raw_token = new_opaque_token()
+        fingerprint = token_fingerprint(raw_token)
+        created_at = datetime.now(UTC).isoformat()
+        expires_at = int(time.time()) + ttl_seconds
+        safe_next = _normalize_next_path(next_path)
+        with self._connect() as connection:
+            connection.execute(
+                "DELETE FROM auth_magic_links WHERE expires_at < ?",
+                (int(time.time()),),
+            )
+            connection.execute(
+                """
+                INSERT INTO auth_magic_links(
+                    token_fingerprint,
+                    email,
+                    next_path,
+                    created_at,
+                    expires_at
+                )
+                VALUES(?, ?, ?, ?, ?)
+                """,
+                (fingerprint, normalized_email, safe_next, created_at, expires_at),
+            )
+        return (
+            MagicLinkRecord(
+                token_fingerprint=fingerprint,
+                email=normalized_email,
+                next_path=safe_next,
+                created_at=created_at,
+                expires_at=expires_at,
+            ),
+            raw_token,
+        )
+
+    def get_magic_link(self, raw_token: str) -> MagicLinkRecord | None:
+        fingerprint = token_fingerprint(raw_token)
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT token_fingerprint, email, next_path, created_at, expires_at
+                FROM auth_magic_links
+                WHERE token_fingerprint = ?
+                """,
+                (fingerprint,),
+            ).fetchone()
+            if row is None:
+                return None
+            if int(row["expires_at"]) < int(time.time()):
+                connection.execute(
+                    "DELETE FROM auth_magic_links WHERE token_fingerprint = ?",
+                    (fingerprint,),
+                )
+                return None
+        return MagicLinkRecord(
+            token_fingerprint=str(row["token_fingerprint"]),
+            email=str(row["email"]),
+            next_path=str(row["next_path"]),
+            created_at=str(row["created_at"]),
+            expires_at=int(row["expires_at"]),
+        )
+
+    def consume_magic_link(self, raw_token: str) -> ConsumedMagicLink | None:
+        fingerprint = token_fingerprint(raw_token)
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT email, next_path, expires_at
+                FROM auth_magic_links
+                WHERE token_fingerprint = ?
+                """,
+                (fingerprint,),
+            ).fetchone()
+            connection.execute(
+                "DELETE FROM auth_magic_links WHERE token_fingerprint = ?",
+                (fingerprint,),
+            )
+            if row is None or int(row["expires_at"]) < int(time.time()):
+                return None
+            user = self._get_or_create_user_by_email(connection, str(row["email"]))
+        return ConsumedMagicLink(user=user, next_path=str(row["next_path"]))
+
+    def delete_magic_link(self, raw_token: str) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                "DELETE FROM auth_magic_links WHERE token_fingerprint = ?",
+                (token_fingerprint(raw_token),),
+            )
+
+    def _get_or_create_user_by_email(
+        self,
+        connection: sqlite3.Connection,
+        normalized_email: str,
+    ) -> UserRecord:
+        row = connection.execute(
+            """
+            SELECT user_id, email, created_at
+            FROM auth_users
+            WHERE email = ?
+            """,
+            (normalized_email,),
+        ).fetchone()
+        if row is not None:
+            return UserRecord(
+                user_id=str(row["user_id"]),
+                email=str(row["email"]),
+                created_at=str(row["created_at"]),
+            )
+
+        user_id = new_opaque_token(bytes_length=16)
+        created_at = datetime.now(UTC).isoformat()
+        connection.execute(
+            """
+            INSERT INTO auth_users(user_id, email, password_hash, created_at)
+            VALUES(?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                normalized_email,
+                hash_password(new_opaque_token()),
+                created_at,
+            ),
+        )
+        return UserRecord(user_id=user_id, email=normalized_email, created_at=created_at)
 
     def get_user(self, user_id: str) -> UserRecord | None:
         with self._connect() as connection:
@@ -716,3 +886,20 @@ class SQLiteAuthStore:
                 "DELETE FROM oauth_refresh_tokens WHERE token_fingerprint = ?",
                 (token_fingerprint(token),),
             )
+
+
+def _normalize_email(email: str) -> str:
+    normalized_email = email.strip().lower()
+    if "@" not in normalized_email or " " in normalized_email:
+        raise ValueError("email must look like a valid address")
+    local_part, _separator, domain = normalized_email.partition("@")
+    if not local_part or "." not in domain:
+        raise ValueError("email must look like a valid address")
+    return normalized_email
+
+
+def _normalize_next_path(next_path: str) -> str:
+    normalized = next_path.strip()
+    if normalized.startswith("/") and not normalized.startswith("//"):
+        return normalized
+    return "/dashboard"
